@@ -81,7 +81,7 @@ export default function BudgetTracker() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Budget Tracker</h1>
-          <p className="text-sm text-slate-500 mt-1">SOW baseline vs. actual Wrike hours</p>
+          <p className="text-sm text-slate-500 mt-1">SOW baseline vs. actual work hours</p>
         </div>
         <select
           className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
