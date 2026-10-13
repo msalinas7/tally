@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { fetchTaskEvents, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
 import { fetchReleasesWithProject } from '../lib/queries/releases'
 import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
@@ -61,15 +61,18 @@ function BurnBar({ pct }) {
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
+  const [budgetLoading, setBudgetLoading] = useState(false)
   const [error, setError] = useState(null)
 
   // Data
   const [releases, setReleases] = useState([])
+  const [selectedReleaseId, setSelectedReleaseId] = useState(null)
   const [completedTasks, setCompletedTasks] = useState([])
   const [allEvents, setAllEvents] = useState([])
   const [baseline, setBaseline] = useState([])
-  const [wrike, setWrike] = useState([])
+  const [devHours, setDevHours] = useState([])
 
+  // Load releases + delivery events on mount
   useEffect(() => {
     async function load() {
       try {
@@ -84,15 +87,9 @@ export default function Dashboard() {
         setAllEvents(events)
         setCompletedTasks(computeCompletedTasks(events))
 
-        // Load budget for the most recent release
-        const latest = relList[0] // already ordered desc by id
-        if (latest) {
-          const [{ data: b }, { data: w }] = await Promise.all([
-            fetchBudgetBaseline(latest.id),
-            fetchDevHours(latest?.version_name ?? null),
-          ])
-          setBaseline(b ?? [])
-          setWrike(w ?? []) // dev hours rows from task_events
+        // Default to most recent release
+        if (relList.length > 0) {
+          setSelectedReleaseId(relList[0].id)
         }
       } catch (e) {
         setError(e.message)
@@ -103,13 +100,38 @@ export default function Dashboard() {
     load()
   }, [])
 
+  // Re-fetch budget data whenever selected release changes
+  useEffect(() => {
+    if (!selectedReleaseId) return
+    const selected = releases.find((r) => r.id === selectedReleaseId)
+    if (!selected) return
+
+    async function loadBudget() {
+      setBudgetLoading(true)
+      try {
+        const [{ data: b }, { data: w }] = await Promise.all([
+          fetchBudgetBaseline(selected.id),
+          fetchDevHours(selected.version_name ?? null),
+        ])
+        setBaseline(b ?? [])
+        setDevHours(w ?? [])
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setBudgetLoading(false)
+      }
+    }
+    loadBudget()
+  }, [selectedReleaseId, releases])
+
   /* ── Derived metrics ── */
+  const selectedRelease = releases.find((r) => r.id === selectedReleaseId) ?? releases[0]
   const activeRelease = releases.find((r) => r.status === 'In Progress') ?? releases[0]
 
-  // Budget burn for active release — actual hours from dev_hours_by_epic view
+  // Budget burn for selected release — actual hours from dev_hours_by_epic view
   const releaseBudget = baseline.reduce((s, r) => s + Number(r.budgeted_cost ?? 0), 0)
   const releaseActual = baseline.reduce((acc, row) => {
-    const devRows = wrike.filter((w) => w.resource === row.resource)
+    const devRows = devHours.filter((w) => w.resource === row.resource)
     const actualHours = devRows.reduce((s, w) => s + Number(w.hours_logged ?? 0), 0)
     return acc + actualHours * Number(row.hourly_rate ?? 0)
   }, 0)
@@ -124,17 +146,41 @@ export default function Dashboard() {
   const allTaskIds = new Set(allEvents.map((e) => e.task_id))
   const inFlight = [...allTaskIds].filter((id) => !taskIdsWithDone.has(id)).length
 
-  // Release on-time check
+  // Release on-time check (for selected release card)
   const isLate =
-    activeRelease?.planned_delivery_date &&
-    !activeRelease?.delivery_date &&
-    new Date(activeRelease.planned_delivery_date) < new Date()
+    selectedRelease?.planned_delivery_date &&
+    !selectedRelease?.delivery_date &&
+    new Date(selectedRelease.planned_delivery_date) < new Date()
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">Program overview across delivery, budget, and releases</p>
+      {/* ── Page header with release filter ── */}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Program overview across delivery, budget, and releases</p>
+        </div>
+
+        {/* Release version filter */}
+        {releases.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <label htmlFor="release-filter" className="text-sm font-medium text-slate-600 whitespace-nowrap">
+              Release Version
+            </label>
+            <select
+              id="release-filter"
+              value={selectedReleaseId ?? ''}
+              onChange={(e) => setSelectedReleaseId(Number(e.target.value))}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {releases.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.version_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -145,8 +191,8 @@ export default function Dashboard() {
         <div className="py-20 text-center text-sm text-slate-400">Loading…</div>
       ) : (
         <>
-          {/* ── Delivery KPIs ── */}
-          <SectionHeading title="Delivery" />
+          {/* ── Delivery KPIs — always global ── */}
+          <SectionHeading title="Delivery (All Releases)" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <StatCard
               label="Avg Lead Time"
@@ -172,46 +218,50 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* ── Budget KPIs ── */}
-          <SectionHeading title={`Budget — ${activeRelease?.version_name ?? 'Latest Release'}`} />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <StatCard label="Total Budgeted" value={fmt$(releaseBudget || null)} />
-            <StatCard label="Total Actual" value={fmt$(releaseActual || null)} />
-            <StatCard
-              label="Remaining"
-              value={releaseBudget ? fmt$(releaseBudget - releaseActual) : '—'}
-              warn={releaseBudget > 0 && releaseActual > releaseBudget}
-            />
-            <StatCard
-              label="Burn %"
-              value={burnPct != null ? `${burnPct}%` : '—'}
-              sub="of baseline budget"
-              warn={burnPct != null && burnPct >= 90}
-            />
-          </div>
+          {/* ── Budget KPIs — scoped to selected release ── */}
+          <SectionHeading title={`Budget — ${selectedRelease?.version_name ?? '—'}`} />
+          {budgetLoading ? (
+            <div className="mb-8 py-8 text-center text-sm text-slate-400">Loading budget…</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <StatCard label="Total Budgeted" value={fmt$(releaseBudget || null)} />
+              <StatCard label="Total Actual" value={fmt$(releaseActual || null)} />
+              <StatCard
+                label="Remaining"
+                value={releaseBudget ? fmt$(releaseBudget - releaseActual) : '—'}
+                warn={releaseBudget > 0 && releaseActual > releaseBudget}
+              />
+              <StatCard
+                label="Burn %"
+                value={burnPct != null ? `${burnPct}%` : '—'}
+                sub="of baseline budget"
+                warn={burnPct != null && burnPct >= 90}
+              />
+            </div>
+          )}
 
-          {/* ── Active release card ── */}
-          {activeRelease && (
+          {/* ── Selected release card ── */}
+          {selectedRelease && (
             <>
-              <SectionHeading title="Active Release" />
+              <SectionHeading title={`Release — ${selectedRelease.version_name}`} />
               <div className="bg-white rounded-lg border border-slate-200 p-5 mb-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-lg font-semibold text-slate-900">{activeRelease.version_name}</span>
-                      <Badge status={activeRelease.status} />
+                      <span className="text-lg font-semibold text-slate-900">{selectedRelease.version_name}</span>
+                      <Badge status={selectedRelease.status} />
                       {isLate && (
                         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
                           Overdue
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500">{activeRelease.projects?.name ?? '—'}</p>
+                    <p className="text-sm text-slate-500">{selectedRelease.projects?.name ?? '—'}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs text-slate-400">Planned delivery</p>
                     <p className={`text-sm font-medium ${isLate ? 'text-red-600' : 'text-slate-700'}`}>
-                      {fmtDate(activeRelease.planned_delivery_date)}
+                      {fmtDate(selectedRelease.planned_delivery_date)}
                     </p>
                   </div>
                 </div>
@@ -219,23 +269,23 @@ export default function Dashboard() {
                 <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3 text-sm">
                   <div>
                     <p className="text-xs text-slate-400">Start date</p>
-                    <p className="text-slate-700 font-medium">{fmtDate(activeRelease.start_date)}</p>
+                    <p className="text-slate-700 font-medium">{fmtDate(selectedRelease.start_date)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Team size</p>
-                    <p className="text-slate-700 font-medium">{activeRelease.team_size ?? '—'}</p>
+                    <p className="text-slate-700 font-medium">{selectedRelease.team_size ?? '—'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Change requests</p>
-                    <p className="text-slate-700 font-medium">{activeRelease.change_requests_count ?? '—'}</p>
+                    <p className="text-slate-700 font-medium">{selectedRelease.change_requests_count ?? '—'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-400">Bugs in QA</p>
-                    <p className="text-slate-700 font-medium">{activeRelease.bugs_in_qa ?? '—'}</p>
+                    <p className="text-slate-700 font-medium">{selectedRelease.bugs_in_qa ?? '—'}</p>
                   </div>
                 </div>
 
-                {releaseBudget > 0 && (
+                {releaseBudget > 0 && !budgetLoading && (
                   <div className="mt-4">
                     <p className="text-xs text-slate-400 mb-1">Budget burn</p>
                     <BurnBar pct={burnPct ?? 0} />
@@ -269,7 +319,11 @@ export default function Dashboard() {
                         !r.delivery_date &&
                         new Date(r.planned_delivery_date) < new Date()
                       return (
-                        <tr key={r.id} className="hover:bg-slate-50">
+                        <tr
+                          key={r.id}
+                          className={`hover:bg-slate-50 cursor-pointer ${r.id === selectedReleaseId ? 'bg-blue-50' : ''}`}
+                          onClick={() => setSelectedReleaseId(r.id)}
+                        >
                           <td className="px-4 py-3 font-medium text-slate-900">{r.version_name}</td>
                           <td className="px-4 py-3 text-slate-500">{r.projects?.name ?? '—'}</td>
                           <td className="px-4 py-3"><Badge status={r.status} /></td>
