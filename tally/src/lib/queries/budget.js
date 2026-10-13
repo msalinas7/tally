@@ -15,10 +15,22 @@ export async function fetchBudgetBaseline(releaseId) {
     .order('resource', { ascending: true })
 }
 
-export async function fetchWrikeHoursByRelease() {
+// Derived dev hours from task_events (In Progress → Ready for QA spans)
+// Filtered by product_version which matches release version_name
+export async function fetchDevHours(productVersion) {
+  const q = supabase
+    .from('dev_hours_by_epic')
+    .select('resource, epic_name, milestone_name, product_version, task_id, task_name, hours_logged, in_progress_at, ready_for_qa_at')
+  if (productVersion) q.eq('product_version', productVersion)
+  return q
+}
+
+// PM/QA standard hours
+export async function fetchPmHours(releaseId) {
   return supabase
-    .from('wrike_hours')
-    .select('resource, hours_logged, actual_cost, week_ending')
+    .from('pm_hours')
+    .select('*')
+    .eq('release_id', releaseId)
     .order('week_ending', { ascending: true })
 }
 
