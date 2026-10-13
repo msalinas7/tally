@@ -7,6 +7,8 @@ const navItems = [
   { to: '/delivery', label: 'Delivery Metrics' },
   { to: '/budget', label: 'Budget Tracker' },
   { to: '/releases', label: 'Release Register' },
+  { to: '/milestones', label: 'Milestones' },
+  { to: '/epics', label: 'Epics' },
 ]
 
 export default function Layout() {

@@ -4,6 +4,8 @@ import Layout from './components/Layout'
 import BudgetTracker from './pages/BudgetTracker'
 import Dashboard from './pages/Dashboard'
 import DeliveryMetrics from './pages/DeliveryMetrics'
+import EpicsManager from './pages/EpicsManager'
+import MilestoneRegister from './pages/MilestoneRegister'
 import ReleaseRegister from './pages/ReleaseRegister'
 
 export default function App() {
@@ -17,6 +19,8 @@ export default function App() {
             <Route path="/delivery" element={<DeliveryMetrics />} />
             <Route path="/budget" element={<BudgetTracker />} />
             <Route path="/releases" element={<ReleaseRegister />} />
+            <Route path="/milestones" element={<MilestoneRegister />} />
+            <Route path="/epics" element={<EpicsManager />} />
           </Route>
         </Routes>
       </AuthGuard>
