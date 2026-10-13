@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchTaskEvents, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
 import { fetchReleasesWithProject } from '../lib/queries/releases'
-import { fetchBudgetBaseline, fetchWrikeHoursByRelease } from '../lib/queries/budget'
+import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
 
 const fmt$ = (n) =>
   n == null
@@ -89,10 +89,10 @@ export default function Dashboard() {
         if (latest) {
           const [{ data: b }, { data: w }] = await Promise.all([
             fetchBudgetBaseline(latest.id),
-            fetchWrikeHoursByRelease(),
+            fetchDevHours(latest?.version_name ?? null),
           ])
           setBaseline(b ?? [])
-          setWrike(w ?? [])
+          setWrike(w ?? []) // dev hours rows from task_events
         }
       } catch (e) {
         setError(e.message)
@@ -106,11 +106,12 @@ export default function Dashboard() {
   /* ── Derived metrics ── */
   const activeRelease = releases.find((r) => r.status === 'In Progress') ?? releases[0]
 
-  // Budget burn for active release
+  // Budget burn for active release — actual hours from dev_hours_by_epic view
   const releaseBudget = baseline.reduce((s, r) => s + Number(r.budgeted_cost ?? 0), 0)
   const releaseActual = baseline.reduce((acc, row) => {
-    const actuals = wrike.filter((w) => w.resource === row.resource)
-    return acc + actuals.reduce((s, w) => s + Number(w.actual_cost ?? 0), 0)
+    const devRows = wrike.filter((w) => w.resource === row.resource)
+    const actualHours = devRows.reduce((s, w) => s + Number(w.hours_logged ?? 0), 0)
+    return acc + actualHours * Number(row.hourly_rate ?? 0)
   }, 0)
   const burnPct = releaseBudget > 0 ? Math.round((releaseActual / releaseBudget) * 100) : null
 
