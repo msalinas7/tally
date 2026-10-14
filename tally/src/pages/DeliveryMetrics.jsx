@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import InfoTooltip from '../components/InfoTooltip'
 import {
   Bar,
   BarChart,
@@ -53,19 +54,23 @@ function ChartTooltip({ active, payload, label }) {
   )
 }
 
-function SortHeader({ label, column, sort, onSort }) {
+
+function SortHeader({ label, column, sort, onSort, tooltip }) {
   const active = sort.column === column
   return (
-    <button
-      type="button"
-      onClick={() => onSort(column)}
-      className="inline-flex items-center gap-1 text-left font-medium text-slate-600 hover:text-slate-900"
-    >
-      {label}
-      <span className={active ? 'text-[#1F3864]' : 'text-slate-300'}>
-        {active && sort.direction === 'desc' ? '↓' : '↑'}
-      </span>
-    </button>
+    <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="inline-flex items-center gap-1 text-left font-medium text-slate-600 hover:text-slate-900"
+      >
+        {label}
+        <span className={active ? 'text-[#1F3864]' : 'text-slate-300'}>
+          {active && sort.direction === 'desc' ? '↓' : '↑'}
+        </span>
+      </button>
+      {tooltip && <InfoTooltip text={tooltip} />}
+    </span>
   )
 }
 
@@ -317,6 +322,7 @@ export default function DeliveryMetrics() {
                       column="leadTimeDays"
                       sort={sort}
                       onSort={handleSort}
+                      tooltip="Total elapsed time from when a task is created to when it reaches Done. Includes any time the task spent waiting before work began."
                     />
                   </th>
                   <th className="px-4 py-3">
@@ -325,6 +331,7 @@ export default function DeliveryMetrics() {
                       column="cycleTimeDays"
                       sort={sort}
                       onSort={handleSort}
+                      tooltip="Active work period only — from when a task moves to In Progress until it reaches Done. A proxy for team execution speed."
                     />
                   </th>
                 </tr>

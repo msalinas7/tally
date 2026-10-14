@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchTaskEvents, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
 import { fetchReleasesWithProject } from '../lib/queries/releases'
 import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
+import InfoTooltip from '../components/InfoTooltip'
 
 const fmt$ = (n) =>
   n == null
@@ -14,10 +15,13 @@ const fmtDate = (d) =>
 const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10)
 
 /* ── Stat card ── */
-function StatCard({ label, value, sub, accent, warn }) {
+function StatCard({ label, value, sub, accent, warn, tooltip }) {
   return (
     <div className={`rounded-lg border p-5 bg-white ${warn ? 'border-amber-300' : 'border-slate-200'}`}>
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center">
+        {label}
+        {tooltip && <InfoTooltip text={tooltip} />}
+      </p>
       <p className={`text-3xl font-bold mt-2 ${accent ?? 'text-slate-900'}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
     </div>
@@ -198,11 +202,13 @@ export default function Dashboard() {
               label="Avg Lead Time"
               value={avgLeadTime != null ? `${avgLeadTime}d` : '—'}
               sub="task created → done"
+              tooltip="Lead Time measures the total elapsed time from when a task is created to when it reaches Done. Includes any time the task spent waiting before work began."
             />
             <StatCard
               label="Avg Cycle Time"
               value={avgCycleTime != null ? `${avgCycleTime}d` : '—'}
               sub="in progress → done"
+              tooltip="Cycle Time measures only the active work period — from when a task moves to In Progress until it reaches Done. A proxy for team execution speed."
             />
             <StatCard
               label="Tasks Delivered"
