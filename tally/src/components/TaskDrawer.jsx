@@ -3,10 +3,15 @@ import { fetchTasksWithHierarchy } from '../lib/queries/delivery'
 
 const UNASSIGNED = '__unassigned__'
 
-const QA_STATUSES = {
-  'Ready for QA':  { bg: 'bg-violet-100', text: 'text-violet-700' },
-  'QA Approved':   { bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  'QA Rejected':   { bg: 'bg-red-100', text: 'text-red-700' },
+const STATUS_STYLES = {
+  'In progress':              { bg: 'bg-blue-100',   text: 'text-blue-700' },
+  'In Code Review':           { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+  'Merged - Ready for Build': { bg: 'bg-cyan-100',   text: 'text-cyan-700' },
+  'Ready For QA':             { bg: 'bg-violet-100', text: 'text-violet-700' },
+  'In QA Review':             { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'QA Approved':              { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  'QA Rejected':              { bg: 'bg-red-100',    text: 'text-red-700' },
+  'Blocked':                  { bg: 'bg-orange-100', text: 'text-orange-700' },
 }
 
 function elapsedLabel(since) {
@@ -17,8 +22,8 @@ function elapsedLabel(since) {
   return `${Math.round(hours / 24)}d`
 }
 
-function QABadge({ status, since }) {
-  const style = QA_STATUSES[status]
+function StatusBadge({ status, since }) {
+  const style = STATUS_STYLES[status]
   if (!style) return null
   const elapsed = elapsedLabel(since)
   return (
@@ -131,7 +136,7 @@ export default function TaskDrawer({ open, onClose, title, taskIds, accent = 'te
                       <p className="text-sm text-slate-700 leading-snug">{t.task_name ?? 'Untitled'}</p>
                     </div>
                     <div className="shrink-0">
-                      <QABadge status={t.latestStatus} since={t.latestStatusAt} />
+                      <StatusBadge status={t.latestStatus} since={t.latestStatusAt} />
                     </div>
                   </div>
                 ))}
