@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { setSelectedReleaseId } from '../store/filtersSlice'
 import { fetchTaskEvents, fetchTasksByVersion, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
 import { fetchReleasesWithProject } from '../lib/queries/releases'
 import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
@@ -83,13 +85,15 @@ function BurnBar({ pct }) {
 }
 
 export default function Dashboard() {
+  const dispatch = useDispatch()
+  const selectedReleaseId = useSelector((state) => state.filters.selectedReleaseId)
+
   const [loading, setLoading] = useState(true)
   const [budgetLoading, setBudgetLoading] = useState(false)
   const [error, setError] = useState(null)
 
   // Data
   const [releases, setReleases] = useState([])
-  const [selectedReleaseId, setSelectedReleaseId] = useState(null)
   const [completedTasks, setCompletedTasks] = useState([])
   const [allEvents, setAllEvents] = useState([])
   const [allVersionTasks, setAllVersionTasks] = useState([])
@@ -114,9 +118,9 @@ export default function Dashboard() {
         setAllEvents(events)
         setCompletedTasks(computeCompletedTasks(events))
 
-        // Default to most recent release
-        if (relList.length > 0) {
-          setSelectedReleaseId(relList[0].id)
+        // Default to most recent release only if no preference is saved
+        if (relList.length > 0 && !selectedReleaseId) {
+          dispatch(setSelectedReleaseId(relList[0].id))
         }
       } catch (e) {
         setError(e.message)
@@ -214,7 +218,7 @@ export default function Dashboard() {
             <select
               id="release-filter"
               value={selectedReleaseId ?? ''}
-              onChange={(e) => setSelectedReleaseId(Number(e.target.value))}
+              onChange={(e) => dispatch(setSelectedReleaseId(Number(e.target.value)))}
               className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               {releases.map((r) => (
@@ -383,7 +387,7 @@ export default function Dashboard() {
                         <tr
                           key={r.id}
                           className={`hover:bg-slate-50 cursor-pointer ${r.id === selectedReleaseId ? 'bg-blue-50' : ''}`}
-                          onClick={() => setSelectedReleaseId(r.id)}
+                          onClick={() => dispatch(setSelectedReleaseId(r.id))}
                         >
                           <td className="px-4 py-3 font-medium text-slate-900">{r.version_name}</td>
                           <td className="px-4 py-3 text-slate-500">{r.projects?.name ?? '—'}</td>

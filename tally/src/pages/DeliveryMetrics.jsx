@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { setProductVersion } from '../store/filtersSlice'
 import InfoTooltip from '../components/InfoTooltip'
 import {
   Bar,
@@ -75,10 +77,12 @@ function SortHeader({ label, column, sort, onSort, tooltip }) {
 }
 
 export default function DeliveryMetrics() {
+  const dispatch = useDispatch()
+  const version = useSelector((state) => state.filters.productVersion)
+
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [version, setVersion] = useState(ALL_VERSIONS)
   const [sort, setSort] = useState({ column: 'cycleTimeDays', direction: 'asc' })
 
   useEffect(() => {
@@ -194,7 +198,7 @@ export default function DeliveryMetrics() {
           <span className="font-medium text-slate-600">Product Version</span>
           <select
             value={version}
-            onChange={(event) => setVersion(event.target.value)}
+            onChange={(event) => dispatch(setProductVersion(event.target.value))}
             className="min-w-[180px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
           >
             <option value={ALL_VERSIONS}>All versions</option>

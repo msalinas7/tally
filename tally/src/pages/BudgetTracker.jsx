@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { setSelectedReleaseId } from '../store/filtersSlice'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
@@ -26,9 +28,11 @@ const isDevRole = (role) => {
 }
 
 export default function BudgetTracker() {
+  const dispatch = useDispatch()
+  const selectedRelease = useSelector((state) => state.filters.selectedReleaseId)
+
   const [tab, setTab] = useState('overview')
   const [releases, setReleases] = useState([])
-  const [selectedRelease, setSelectedRelease] = useState(null)
   const [baseline, setBaseline] = useState([])
   const [devHours, setDevHours] = useState([])
   const [pmHours, setPmHours] = useState([])
@@ -65,7 +69,7 @@ export default function BudgetTracker() {
       if (e) { setError(e.message); return }
       const list = data ?? []
       setReleases(list)
-      if (list.length > 0) setSelectedRelease(list[list.length - 1].id)
+      if (list.length > 0 && !selectedRelease) dispatch(setSelectedReleaseId(list[list.length - 1].id))
     })
   }, [])
 
@@ -159,7 +163,7 @@ export default function BudgetTracker() {
         <select
           className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
           value={selectedRelease ?? ''}
-          onChange={(e) => { setSelectedRelease(Number(e.target.value)); setFilterMilestone(''); setFilterEpic('') }}
+          onChange={(e) => { dispatch(setSelectedReleaseId(Number(e.target.value))); setFilterMilestone(''); setFilterEpic('') }}
         >
           {releases.map((r) => (
             <option key={r.id} value={r.id}>{r.version_name}</option>
