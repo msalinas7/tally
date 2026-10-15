@@ -3,6 +3,7 @@ import { signOut } from '../lib/auth'
 import { useAuth } from './AuthGuard'
 
 const navItems = [
+  { to: '/release-status', label: 'Release Status' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/delivery', label: 'Delivery Metrics' },
   { to: '/budget', label: 'Budget Tracker' },

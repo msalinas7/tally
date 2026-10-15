@@ -7,6 +7,7 @@ import DeliveryMetrics from './pages/DeliveryMetrics'
 import EpicsManager from './pages/EpicsManager'
 import MilestoneRegister from './pages/MilestoneRegister'
 import ReleaseRegister from './pages/ReleaseRegister'
+import ReleaseStatus from './pages/ReleaseStatus'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/release-status" element={<ReleaseStatus />} />
             <Route path="/delivery" element={<DeliveryMetrics />} />
             <Route path="/budget" element={<BudgetTracker />} />
             <Route path="/releases" element={<ReleaseRegister />} />
