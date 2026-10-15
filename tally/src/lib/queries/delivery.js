@@ -133,11 +133,30 @@ export async function fetchTasksWithHierarchy(taskIds) {
     }
   }
 
-  // 4. Assemble
+  // 4. Latest status event per task
+  const { data: events, error: evErr } = await supabase
+    .from('task_events')
+    .select('task_id, status, received_at')
+    .in('task_id', taskIds)
+    .order('received_at', { ascending: false })
+  if (evErr) throw evErr
+
+  const latestEventByTask = {}
+  for (const ev of events ?? []) {
+    if (!latestEventByTask[ev.task_id]) latestEventByTask[ev.task_id] = ev
+  }
+
+  // 5. Assemble
   return (tasks ?? []).map((task) => {
     const epic = task.epic_id ? epicsById[task.epic_id] ?? null : null
     const milestone = epic?.milestone_id ? milestonesById[epic.milestone_id] ?? null : null
-    return { ...task, epics: epic ? { ...epic, milestones: milestone } : null }
+    const latestEvent = latestEventByTask[task.id] ?? null
+    return {
+      ...task,
+      epics: epic ? { ...epic, milestones: milestone } : null,
+      latestStatus: latestEvent?.status ?? null,
+      latestStatusAt: latestEvent?.received_at ?? null,
+    }
   })
 }
 
