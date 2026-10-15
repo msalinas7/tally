@@ -15,7 +15,7 @@ export default function App() {
       <AuthGuard>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/release-status" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/release-status" element={<ReleaseStatus />} />
             <Route path="/delivery" element={<DeliveryMetrics />} />
