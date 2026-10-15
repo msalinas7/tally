@@ -169,20 +169,36 @@ export default function Dashboard() {
   const avgLeadTime = round1(averageDays(filteredCompleted.map((t) => t.leadTimeDays)))
   const avgCycleTime = round1(averageDays(filteredCompleted.map((t) => t.cycleTimeDays)))
 
-  // Tasks in flight — scoped to selected version, have events but no Done
+  // Build latest-status map per task from allEvents (sorted asc, so last wins)
+  const latestStatusByTaskId = {}
+  for (const e of allEvents) {
+    if (!selectedVersion || e.tasks?.product_version === selectedVersion) {
+      latestStatusByTaskId[e.task_id] = (e.status ?? '').trim().toLowerCase()
+    }
+  }
+
+  const NOT_STARTED_STATUS = 'not started'
+  const DONE_STATUS = 'done'
+
   const completedIdsInVersion = new Set(filteredCompleted.map((t) => t.id))
-  const allTaskIdsInVersion = new Set(
-    allEvents
-      .filter((e) => !selectedVersion || e.tasks?.product_version === selectedVersion)
-      .map((e) => e.task_id)
-  )
-  const inFlightIds = [...allTaskIdsInVersion].filter((id) => !completedIdsInVersion.has(id))
+
+  // In Flight — has events, latest status is not "not started" and not "done"
+  const inFlightIds = Object.entries(latestStatusByTaskId)
+    .filter(([, status]) => status !== NOT_STARTED_STATUS && status !== DONE_STATUS)
+    .map(([id]) => Number(id))
+
   const inFlight = inFlightIds.length
   const deliveredIds = filteredCompleted.map((t) => t.id)
 
-  // Not Started — tasks for this version with no events at all
+  // Not Started — no events OR latest event status is "not started"
+  const tasksWithNotStartedEvent = new Set(
+    Object.entries(latestStatusByTaskId)
+      .filter(([, status]) => status === NOT_STARTED_STATUS)
+      .map(([id]) => Number(id))
+  )
+  const allTaskIdsWithEvents = new Set(Object.keys(latestStatusByTaskId).map(Number))
   const notStartedIds = allVersionTasks
-    .filter((t) => !allTaskIdsInVersion.has(t.id))
+    .filter((t) => !allTaskIdsWithEvents.has(t.id) || tasksWithNotStartedEvent.has(t.id))
     .map((t) => t.id)
 
   // Budget burn for selected release — actual hours from dev_hours_by_epic view
