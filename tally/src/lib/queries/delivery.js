@@ -92,6 +92,55 @@ export function averageDays(values) {
   return nums.reduce((sum, value) => sum + value, 0) / nums.length
 }
 
+/**
+ * Fetch tasks by ID with their epic and milestone hierarchy.
+ * Uses three flat queries joined client-side to avoid relying on
+ * PostgREST FK auto-detection.
+ */
+export async function fetchTasksWithHierarchy(taskIds) {
+  if (!taskIds || taskIds.length === 0) return []
+
+  // 1. Tasks
+  const { data: tasks, error: te } = await supabase
+    .from('tasks')
+    .select('id, task_name, product_version, epic_id')
+    .in('id', taskIds)
+  if (te) throw te
+
+  // 2. Epics referenced by those tasks
+  const epicIds = [...new Set((tasks ?? []).map((t) => t.epic_id).filter(Boolean))]
+  let epicsById = {}
+  let milestonesById = {}
+
+  if (epicIds.length > 0) {
+    const { data: epics, error: ee } = await supabase
+      .from('epics')
+      .select('id, name, milestone_id')
+      .in('id', epicIds)
+    if (ee) throw ee
+
+    epicsById = Object.fromEntries((epics ?? []).map((e) => [e.id, e]))
+
+    // 3. Milestones referenced by those epics
+    const milestoneIds = [...new Set((epics ?? []).map((e) => e.milestone_id).filter(Boolean))]
+    if (milestoneIds.length > 0) {
+      const { data: milestones, error: me } = await supabase
+        .from('milestones')
+        .select('id, name')
+        .in('id', milestoneIds)
+      if (me) throw me
+      milestonesById = Object.fromEntries((milestones ?? []).map((m) => [m.id, m]))
+    }
+  }
+
+  // 4. Assemble
+  return (tasks ?? []).map((task) => {
+    const epic = task.epic_id ? epicsById[task.epic_id] ?? null : null
+    const milestone = epic?.milestone_id ? milestonesById[epic.milestone_id] ?? null : null
+    return { ...task, epics: epic ? { ...epic, milestones: milestone } : null }
+  })
+}
+
 export function averageCycleTimeByVersion(tasks) {
   const grouped = new Map()
 

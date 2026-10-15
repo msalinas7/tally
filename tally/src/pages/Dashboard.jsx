@@ -3,6 +3,7 @@ import { fetchTaskEvents, computeCompletedTasks, averageDays } from '../lib/quer
 import { fetchReleasesWithProject } from '../lib/queries/releases'
 import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
 import InfoTooltip from '../components/InfoTooltip'
+import TaskDrawer from '../components/TaskDrawer'
 
 const fmt$ = (n) =>
   n == null
@@ -15,12 +16,20 @@ const fmtDate = (d) =>
 const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10)
 
 /* ── Stat card ── */
-function StatCard({ label, value, sub, accent, warn, tooltip }) {
+function StatCard({ label, value, sub, accent, warn, tooltip, onClick }) {
+  const interactive = !!onClick
   return (
-    <div className={`rounded-lg border p-5 bg-white ${warn ? 'border-amber-300' : 'border-slate-200'}`}>
+    <div
+      className={`rounded-lg border p-5 bg-white ${warn ? 'border-amber-300' : 'border-slate-200'} ${interactive ? 'cursor-pointer hover:border-slate-400 hover:shadow-sm transition-shadow' : ''}`}
+      onClick={onClick}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (e) => e.key === 'Enter' && onClick() : undefined}
+    >
       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
+        {interactive && <span className="ml-auto text-slate-300 text-base leading-none">›</span>}
       </p>
       <p className={`text-3xl font-bold mt-2 ${accent ?? 'text-slate-900'}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
@@ -76,6 +85,9 @@ export default function Dashboard() {
   const [baseline, setBaseline] = useState([])
   const [devHours, setDevHours] = useState([])
 
+  // Drawer
+  const [drawer, setDrawer] = useState({ open: false, title: '', taskIds: [], accent: '' })
+
   // Load releases + delivery events on mount
   useEffect(() => {
     async function load() {
@@ -130,7 +142,26 @@ export default function Dashboard() {
 
   /* ── Derived metrics ── */
   const selectedRelease = releases.find((r) => r.id === selectedReleaseId) ?? releases[0]
-  const activeRelease = releases.find((r) => r.status === 'In Progress') ?? releases[0]
+  const selectedVersion = selectedRelease?.version_name ?? null
+
+  // Delivery metrics — scoped to selected release version
+  const filteredCompleted = selectedVersion
+    ? completedTasks.filter((t) => t.productVersion === selectedVersion)
+    : completedTasks
+
+  const avgLeadTime = round1(averageDays(filteredCompleted.map((t) => t.leadTimeDays)))
+  const avgCycleTime = round1(averageDays(filteredCompleted.map((t) => t.cycleTimeDays)))
+
+  // Tasks in flight — scoped to selected version, have events but no Done
+  const completedIdsInVersion = new Set(filteredCompleted.map((t) => t.id))
+  const allTaskIdsInVersion = new Set(
+    allEvents
+      .filter((e) => !selectedVersion || e.tasks?.product_version === selectedVersion)
+      .map((e) => e.task_id)
+  )
+  const inFlightIds = [...allTaskIdsInVersion].filter((id) => !completedIdsInVersion.has(id))
+  const inFlight = inFlightIds.length
+  const deliveredIds = filteredCompleted.map((t) => t.id)
 
   // Budget burn for selected release — actual hours from dev_hours_by_epic view
   const releaseBudget = baseline.reduce((s, r) => s + Number(r.budgeted_cost ?? 0), 0)
@@ -140,15 +171,6 @@ export default function Dashboard() {
     return acc + actualHours * Number(row.hourly_rate ?? 0)
   }, 0)
   const burnPct = releaseBudget > 0 ? Math.round((releaseActual / releaseBudget) * 100) : null
-
-  // Delivery metrics — all time
-  const avgLeadTime = round1(averageDays(completedTasks.map((t) => t.leadTimeDays)))
-  const avgCycleTime = round1(averageDays(completedTasks.map((t) => t.cycleTimeDays)))
-
-  // Tasks in flight (have events but no Done)
-  const taskIdsWithDone = new Set(completedTasks.map((t) => t.id))
-  const allTaskIds = new Set(allEvents.map((e) => e.task_id))
-  const inFlight = [...allTaskIds].filter((id) => !taskIdsWithDone.has(id)).length
 
   // Release on-time check (for selected release card)
   const isLate =
@@ -195,8 +217,8 @@ export default function Dashboard() {
         <div className="py-20 text-center text-sm text-slate-400">Loading…</div>
       ) : (
         <>
-          {/* ── Delivery KPIs — always global ── */}
-          <SectionHeading title="Delivery (All Releases)" />
+          {/* ── Delivery KPIs — scoped to selected release ── */}
+          <SectionHeading title={`Delivery — ${selectedRelease?.version_name ?? '—'}`} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <StatCard
               label="Avg Lead Time"
@@ -212,15 +234,17 @@ export default function Dashboard() {
             />
             <StatCard
               label="Tasks Delivered"
-              value={completedTasks.length}
+              value={filteredCompleted.length}
               sub="reached Done status"
               accent="text-emerald-600"
+              onClick={() => setDrawer({ open: true, title: 'Tasks Delivered', taskIds: deliveredIds, accent: 'text-emerald-600' })}
             />
             <StatCard
               label="In Flight"
               value={inFlight}
               sub="started, not yet done"
               accent={inFlight > 0 ? 'text-blue-600' : 'text-slate-900'}
+              onClick={() => setDrawer({ open: true, title: 'In Flight', taskIds: inFlightIds, accent: 'text-blue-600' })}
             />
           </div>
 
@@ -350,6 +374,14 @@ export default function Dashboard() {
           )}
         </>
       )}
+
+      <TaskDrawer
+        open={drawer.open}
+        onClose={() => setDrawer((d) => ({ ...d, open: false }))}
+        title={drawer.title}
+        taskIds={drawer.taskIds}
+        accent={drawer.accent}
+      />
     </div>
   )
 }
