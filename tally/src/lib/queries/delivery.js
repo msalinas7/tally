@@ -93,6 +93,20 @@ export function averageDays(values) {
 }
 
 /**
+ * Fetch all tasks for a given product_version.
+ * Used to identify "Not Started" tasks (those with no events yet).
+ */
+export async function fetchTasksByVersion(productVersion) {
+  const q = supabase
+    .from('tasks')
+    .select('id, task_name, product_version, epic_id')
+  if (productVersion) q.eq('product_version', productVersion)
+  const { data, error } = await q
+  if (error) throw error
+  return data ?? []
+}
+
+/**
  * Fetch tasks by ID with their epic and milestone hierarchy.
  * Uses three flat queries joined client-side to avoid relying on
  * PostgREST FK auto-detection.

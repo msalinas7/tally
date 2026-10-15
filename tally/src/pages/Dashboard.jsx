@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchTaskEvents, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
+import { fetchTaskEvents, fetchTasksByVersion, computeCompletedTasks, averageDays } from '../lib/queries/delivery'
 import { fetchReleasesWithProject } from '../lib/queries/releases'
 import { fetchBudgetBaseline, fetchDevHours } from '../lib/queries/budget'
 import InfoTooltip from '../components/InfoTooltip'
@@ -20,19 +20,29 @@ function StatCard({ label, value, sub, accent, warn, tooltip, onClick }) {
   const interactive = !!onClick
   return (
     <div
-      className={`rounded-lg border p-5 bg-white ${warn ? 'border-amber-300' : 'border-slate-200'} ${interactive ? 'cursor-pointer hover:border-slate-400 hover:shadow-sm transition-shadow' : ''}`}
+      className={[
+        'rounded-lg border p-5 bg-white transition-all',
+        warn ? 'border-amber-300' : 'border-slate-200',
+        interactive
+          ? 'cursor-pointer hover:border-[#1F3864] hover:shadow-md hover:bg-slate-50 active:scale-[0.98]'
+          : '',
+      ].join(' ')}
       onClick={onClick}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       onKeyDown={interactive ? (e) => e.key === 'Enter' && onClick() : undefined}
     >
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1">
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
-        {interactive && <span className="ml-auto text-slate-300 text-base leading-none">›</span>}
       </p>
       <p className={`text-3xl font-bold mt-2 ${accent ?? 'text-slate-900'}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+      {interactive && (
+        <p className="mt-3 text-xs font-medium text-[#1F3864] flex items-center gap-1">
+          View tasks <span className="text-sm">→</span>
+        </p>
+      )}
     </div>
   )
 }
@@ -82,6 +92,7 @@ export default function Dashboard() {
   const [selectedReleaseId, setSelectedReleaseId] = useState(null)
   const [completedTasks, setCompletedTasks] = useState([])
   const [allEvents, setAllEvents] = useState([])
+  const [allVersionTasks, setAllVersionTasks] = useState([])
   const [baseline, setBaseline] = useState([])
   const [devHours, setDevHours] = useState([])
 
@@ -125,12 +136,14 @@ export default function Dashboard() {
     async function loadBudget() {
       setBudgetLoading(true)
       try {
-        const [{ data: b }, { data: w }] = await Promise.all([
+        const [{ data: b }, { data: w }, versionTasks] = await Promise.all([
           fetchBudgetBaseline(selected.id),
           fetchDevHours(selected.version_name ?? null),
+          fetchTasksByVersion(selected.version_name ?? null),
         ])
         setBaseline(b ?? [])
         setDevHours(w ?? [])
+        setAllVersionTasks(versionTasks)
       } catch (e) {
         setError(e.message)
       } finally {
@@ -162,6 +175,11 @@ export default function Dashboard() {
   const inFlightIds = [...allTaskIdsInVersion].filter((id) => !completedIdsInVersion.has(id))
   const inFlight = inFlightIds.length
   const deliveredIds = filteredCompleted.map((t) => t.id)
+
+  // Not Started — tasks for this version with no events at all
+  const notStartedIds = allVersionTasks
+    .filter((t) => !allTaskIdsInVersion.has(t.id))
+    .map((t) => t.id)
 
   // Budget burn for selected release — actual hours from dev_hours_by_epic view
   const releaseBudget = baseline.reduce((s, r) => s + Number(r.budgeted_cost ?? 0), 0)
@@ -219,7 +237,9 @@ export default function Dashboard() {
         <>
           {/* ── Delivery KPIs — scoped to selected release ── */}
           <SectionHeading title={`Delivery — ${selectedRelease?.version_name ?? '—'}`} />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+
+          {/* Metrics row */}
+          <div className="grid grid-cols-2 gap-4 mb-3">
             <StatCard
               label="Avg Lead Time"
               value={avgLeadTime != null ? `${avgLeadTime}d` : '—'}
@@ -232,19 +252,30 @@ export default function Dashboard() {
               sub="in progress → done"
               tooltip="Cycle Time measures only the active work period — from when a task moves to In Progress until it reaches Done. A proxy for team execution speed."
             />
+          </div>
+
+          {/* Task-state pipeline row — all three clickable */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
             <StatCard
-              label="Tasks Delivered"
-              value={filteredCompleted.length}
-              sub="reached Done status"
-              accent="text-emerald-600"
-              onClick={() => setDrawer({ open: true, title: 'Tasks Delivered', taskIds: deliveredIds, accent: 'text-emerald-600' })}
+              label="Not Started"
+              value={notStartedIds.length}
+              sub="no activity yet"
+              accent="text-slate-500"
+              onClick={() => setDrawer({ open: true, title: 'Not Started', taskIds: notStartedIds, accent: 'text-slate-600' })}
             />
             <StatCard
               label="In Flight"
               value={inFlight}
               sub="started, not yet done"
-              accent={inFlight > 0 ? 'text-blue-600' : 'text-slate-900'}
+              accent="text-blue-600"
               onClick={() => setDrawer({ open: true, title: 'In Flight', taskIds: inFlightIds, accent: 'text-blue-600' })}
+            />
+            <StatCard
+              label="Delivered"
+              value={filteredCompleted.length}
+              sub="reached Done status"
+              accent="text-emerald-600"
+              onClick={() => setDrawer({ open: true, title: 'Delivered', taskIds: deliveredIds, accent: 'text-emerald-600' })}
             />
           </div>
 
