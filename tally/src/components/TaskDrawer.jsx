@@ -12,6 +12,7 @@ const STATUS_STYLES = {
   'QA Approved':              { bg: 'bg-emerald-100', text: 'text-emerald-700' },
   'QA Rejected':              { bg: 'bg-red-100',    text: 'text-red-700' },
   'Blocked':                  { bg: 'bg-orange-100', text: 'text-orange-700' },
+  'Not Started':                  { bg: 'bg-gray-100', text: 'text-gray-700' },
 }
 
 function elapsedLabel(since) {
