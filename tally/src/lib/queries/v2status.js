@@ -74,10 +74,10 @@ function normalizeStatus(raw) {
  * @returns {Promise<Task[]>}
  */
 export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees = [] } = {}) {
-  // ── 1. Tasks + epic join ──────────────────────────────────────────────────
+  // ── 1. Tasks + epic + assignee joins ──────────────────────────────────────
   const { data: rawTasks, error: te } = await supabase
     .from('tasks')
-    .select('id, task_name, product_version, epic_id, epics(id, name)')
+    .select('id, task_name, product_version, epic_id, assigned_to_id, epics(id, name), people(id, name)')
     .eq('product_version', productVersion)
 
   if (te) throw te
@@ -86,7 +86,6 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
   if (tasks.length === 0) return []
 
   // ── 2. Latest task_event per task ─────────────────────────────────────────
-  // Fetch ascending so the last write for each task_id wins when we iterate.
   const taskIds = tasks.map((t) => t.id)
   const { data: events, error: ee } = await supabase
     .from('task_events')
@@ -105,16 +104,18 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
   const normalised = tasks.map((t) => {
     const ev = latestEvent[t.id] ?? null
     const { status, unknown } = normalizeStatus(ev?.status)
+    // people is a single object when joined via assigned_to_id FK
+    const engineerName = t.people?.name ?? null
+    const engineerFirst = engineerName ? engineerName.split(' ')[0] : null
     return {
       id: t.id,
       name: t.task_name ?? 'Untitled',
       status,
       unknownStatus: unknown,
       epic: t.epics?.name ?? null,
-      // assignees live in the `people` table, linked via a tasks_people join table
-      // that doesn't exist in the schema yet.  Return an empty array for now so
-      // excludeAssignees works transparently once the data is available.
-      assignees: [],
+      engineer: engineerName,        // full name e.g. "Renan Santiago"
+      engineerFirst,                 // first name e.g. "Renan" — used for filter matching
+      assignees: engineerName ? [engineerName] : [],
       productVersion: t.product_version,
       updatedAt: ev?.received_at ?? null,
     }

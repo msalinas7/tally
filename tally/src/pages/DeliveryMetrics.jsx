@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { setProductVersion } from '../store/filtersSlice'
+import { setProductVersion, setSelectedEngineer } from '../store/filtersSlice'
 import InfoTooltip from '../components/InfoTooltip'
 import {
   Bar,
@@ -18,6 +18,9 @@ import {
   fetchTaskEvents,
   getProductVersions,
 } from '../lib/queries/delivery'
+import { fetchDevHours } from '../lib/queries/budget'
+
+const ENGINEERS = ['Renan', 'Elkerton', 'Guilherme']
 
 const ALL_VERSIONS = ''
 const CHART_FILL = '#1F3864'
@@ -79,8 +82,11 @@ function SortHeader({ label, column, sort, onSort, tooltip }) {
 export default function DeliveryMetrics() {
   const dispatch = useDispatch()
   const version = useSelector((state) => state.filters.productVersion)
+  const selectedEngineer = useSelector((state) => state.filters.selectedEngineer)
 
   const [tasks, setTasks] = useState([])
+  // task_id → resource name, sourced from dev_hours_by_epic
+  const [taskEngineerMap, setTaskEngineerMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [sort, setSort] = useState({ column: 'cycleTimeDays', direction: 'asc' })
@@ -92,8 +98,20 @@ export default function DeliveryMetrics() {
       setLoading(true)
       setError(null)
       try {
-        const events = await fetchTaskEvents()
-        if (!cancelled) setTasks(computeCompletedTasks(events))
+        // Fetch task events and dev-hours in parallel
+        const [events, { data: devHoursRows }] = await Promise.all([
+          fetchTaskEvents(),
+          fetchDevHours(null), // no version filter — we want all task→engineer mappings
+        ])
+        if (!cancelled) {
+          setTasks(computeCompletedTasks(events))
+          // Build task_id → resource map (last writer wins; each task has one engineer)
+          const map = {}
+          for (const row of devHoursRows ?? []) {
+            if (row.task_id != null && row.resource) map[row.task_id] = row.resource
+          }
+          setTaskEngineerMap(map)
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err?.message ?? 'Unable to load delivery metrics.')
@@ -113,9 +131,16 @@ export default function DeliveryMetrics() {
   const versions = useMemo(() => getProductVersions(tasks), [tasks])
 
   const filteredTasks = useMemo(() => {
-    if (!version) return tasks
-    return tasks.filter((task) => task.productVersion === version)
-  }, [tasks, version])
+    let result = tasks
+    if (version) result = result.filter((task) => task.productVersion === version)
+    if (selectedEngineer) {
+      result = result.filter((task) => {
+        const resource = taskEngineerMap[task.id] ?? ''
+        return resource.toLowerCase().includes(selectedEngineer.toLowerCase())
+      })
+    }
+    return result
+  }, [tasks, version, selectedEngineer, taskEngineerMap])
 
   const sortedTasks = useMemo(() => {
     const copy = [...filteredTasks]
@@ -194,21 +219,36 @@ export default function DeliveryMetrics() {
             Lead time and cycle time for completed tasks.
           </p>
         </div>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-600">Product Version</span>
-          <select
-            value={version}
-            onChange={(event) => dispatch(setProductVersion(event.target.value))}
-            className="min-w-[180px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
-          >
-            <option value={ALL_VERSIONS}>All versions</option>
-            {versions.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-end gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-600">Engineer</span>
+            <select
+              value={selectedEngineer}
+              onChange={(e) => dispatch(setSelectedEngineer(e.target.value))}
+              className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            >
+              <option value="">All engineers</option>
+              {ENGINEERS.map((eng) => (
+                <option key={eng} value={eng}>{eng}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-600">Product Version</span>
+            <select
+              value={version}
+              onChange={(event) => dispatch(setProductVersion(event.target.value))}
+              className="min-w-[180px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            >
+              <option value={ALL_VERSIONS}>All versions</option>
+              {versions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

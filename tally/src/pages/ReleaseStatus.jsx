@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { setProductVersion } from '../store/filtersSlice'
+import { setProductVersion, setSelectedEngineer } from '../store/filtersSlice'
+
+const ENGINEERS = ['Renan', 'Elkerton', 'Guilherme']
 import { getBacklogTasks, getProductVersionList } from '../lib/queries/v2status'
 import { buildEpicRows, groupByFeature, computeProgress } from '../lib/v2status/aggregations'
 import OverallProgressCard from '../components/v2status/OverallProgressCard'
@@ -21,6 +23,7 @@ function fmtTime(iso) {
 export default function ReleaseStatus() {
   const dispatch = useDispatch()
   const storedVersion = useSelector((state) => state.filters.productVersion)
+  const selectedEngineer = useSelector((state) => state.filters.selectedEngineer)
 
   const [versions, setVersions] = useState([])
   const [tasks, setTasks] = useState([])
@@ -77,9 +80,16 @@ export default function ReleaseStatus() {
     return () => clearInterval(intervalRef.current)
   }, [load])
 
-  const overall = computeProgress(tasks)
-  const featureGroups = groupByFeature(tasks, EXCLUDE_ASSIGNEES)
-  const epicRows = buildEpicRows(tasks, EXCLUDE_ASSIGNEES)
+  // Apply engineer filter in-memory so version data stays cached
+  const visibleTasks = selectedEngineer
+    ? tasks.filter((t) =>
+        (t.engineerFirst ?? '').toLowerCase() === selectedEngineer.toLowerCase()
+      )
+    : tasks
+
+  const overall = computeProgress(visibleTasks)
+  const featureGroups = groupByFeature(visibleTasks, EXCLUDE_ASSIGNEES)
+  const epicRows = buildEpicRows(visibleTasks, EXCLUDE_ASSIGNEES)
 
   return (
     <div className="space-y-6">
@@ -96,6 +106,21 @@ export default function ReleaseStatus() {
         </div>
 
         <div className="flex items-end gap-3">
+          {/* Engineer filter */}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-600">Engineer</span>
+            <select
+              value={selectedEngineer}
+              onChange={(e) => dispatch(setSelectedEngineer(e.target.value))}
+              className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            >
+              <option value="">Entire project</option>
+              {ENGINEERS.map((eng) => (
+                <option key={eng} value={eng}>{eng}</option>
+              ))}
+            </select>
+          </label>
+
           {/* Version selector — always visible once we have any version to show */}
           {selectorVersions.length > 0 && (
             <label className="flex flex-col gap-1 text-sm">
@@ -139,15 +164,21 @@ export default function ReleaseStatus() {
       )}
 
       {/* ── Empty ── */}
-      {!loading && !error && tasks.length === 0 && activeVersion && (
+      {!loading && !error && visibleTasks.length === 0 && activeVersion && (
         <div className="rounded-lg border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">No tasks found for {activeVersion}</p>
-          <p className="mt-1 text-sm text-slate-500">Run seed_full_backlog.sql to populate the database.</p>
+          <p className="text-sm font-medium text-slate-700">
+            No tasks found{selectedEngineer ? ` for ${selectedEngineer}` : ''} in {activeVersion}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            {tasks.length > 0
+              ? 'Try selecting a different engineer or "Entire project".'
+              : 'Run seed_full_backlog.sql to populate the database.'}
+          </p>
         </div>
       )}
 
       {/* ── Content ── */}
-      {tasks.length > 0 && (
+      {visibleTasks.length > 0 && (
         <>
           <OverallProgressCard {...overall} />
 
