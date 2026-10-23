@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BUCKET_COLORS } from '../../lib/v2status/aggregations'
+import { supabase } from '../../lib/supabase'
 
 // ── Epic status badge ─────────────────────────────────────────────────────────
 
@@ -99,7 +100,18 @@ function BarLegend() {
 
 // ── Task accordion panel ──────────────────────────────────────────────────────
 
-function TaskList({ tasks }) {
+function TaskList({ tasks, isAdmin, onTaskDeleted }) {
+  const [deleting, setDeleting] = useState(null)
+
+  const handleDelete = async (taskId, taskName) => {
+    if (!window.confirm(`Delete "${taskName}"? This cannot be undone.`)) return
+    setDeleting(taskId)
+    await supabase.from('task_events').delete().eq('task_id', taskId)
+    await supabase.from('tasks').delete().eq('id', taskId)
+    setDeleting(null)
+    onTaskDeleted?.()
+  }
+
   return (
     <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2">
       {tasks.length === 0 ? (
@@ -111,7 +123,20 @@ function TaskList({ tasks }) {
               <span className="min-w-0 flex-1 truncate text-xs text-slate-700" title={t.name}>
                 {t.name}
               </span>
-              <TaskStatusBadge status={t.status} />
+              <div className="flex shrink-0 items-center gap-2">
+                <TaskStatusBadge status={t.status} />
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(t.id, t.name)}
+                    disabled={deleting === t.id}
+                    className="text-[10px] text-slate-300 hover:text-red-500 disabled:opacity-40 transition-colors"
+                    title="Delete task"
+                  >
+                    {deleting === t.id ? '…' : '✕'}
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -122,7 +147,7 @@ function TaskList({ tasks }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function EpicStatusList({ rows }) {
+export default function EpicStatusList({ rows, isAdmin = false, onTaskDeleted }) {
   const [openEpic, setOpenEpic] = useState(null)
 
   if (rows.length === 0) {
@@ -182,7 +207,7 @@ export default function EpicStatusList({ rows }) {
               </button>
 
               {/* Accordion panel */}
-              {isOpen && <TaskList tasks={tasks ?? []} />}
+              {isOpen && <TaskList tasks={tasks ?? []} isAdmin={isAdmin} onTaskDeleted={onTaskDeleted} />}
             </div>
           )
         })}

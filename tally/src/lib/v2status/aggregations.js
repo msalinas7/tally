@@ -90,6 +90,29 @@ export function computeProgress(tasks) {
 }
 
 /**
+ * Groups tasks by milestone and computes progress for each.
+ * Tasks with no milestone are placed in an '(No milestone)' bucket.
+ *
+ * @param {import('../queries/v2status').Task[]} tasks
+ * @returns {Array<{ feature: string, pct: number, complete: number, total: number, tasks: Task[] }>}
+ */
+export function groupByMilestone(tasks) {
+  const map = new Map()
+  for (const t of tasks) {
+    const key = t.milestone ?? '(No milestone)'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(t)
+  }
+  return [...map.entries()]
+    .map(([name, milestoneTasks]) => ({
+      feature: name,
+      ...computeProgress(milestoneTasks),
+      tasks: milestoneTasks,
+    }))
+    .sort((a, b) => b.pct - a.pct)
+}
+
+/**
  * Groups tasks into features and computes progress for each.
  * Tasks whose epic doesn't match any feature are placed in an 'Other' bucket.
  *

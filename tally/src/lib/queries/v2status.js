@@ -77,7 +77,7 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
   // ── 1. Tasks + epic + assignee joins ──────────────────────────────────────
   const { data: rawTasks, error: te } = await supabase
     .from('tasks')
-    .select('id, task_name, product_version, epic_id, assigned_to_id, epics(id, name), people(id, name)')
+    .select('id, task_name, product_version, epic_id, assigned_to_id, epics(id, name, milestones(id, name)), people(id, name)')
     .eq('product_version', productVersion)
 
   if (te) throw te
@@ -113,6 +113,7 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
       status,
       unknownStatus: unknown,
       epic: t.epics?.name ?? null,
+      milestone: t.epics?.milestones?.name ?? null,
       engineer: engineerName,        // full name e.g. "Renan Santiago"
       engineerFirst,                 // first name e.g. "Renan" — used for filter matching
       assignees: engineerName ? [engineerName] : [],

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { setProductVersion, setSelectedEngineer } from '../store/filtersSlice'
+import { useAuth } from '../components/AuthGuard'
+
+const ADMIN_EMAIL = 'maria.salinas@puzzle.tech'
 
 const ENGINEERS = ['Renan', 'Elkerton', 'Guilherme']
 import { getBacklogTasks, getProductVersionList } from '../lib/queries/v2status'
-import { buildEpicRows, groupByFeature, computeProgress } from '../lib/v2status/aggregations'
+import { buildEpicRows, groupByMilestone, computeProgress } from '../lib/v2status/aggregations'
 import OverallProgressCard from '../components/v2status/OverallProgressCard'
 import FeatureProgressCards from '../components/v2status/FeatureProgressCards'
 import EpicStatusList from '../components/v2status/EpicStatusList'
@@ -22,6 +25,8 @@ function fmtTime(iso) {
 
 export default function ReleaseStatus() {
   const dispatch = useDispatch()
+  const { user } = useAuth()
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL
   const storedVersion = useSelector((state) => state.filters.productVersion)
   const selectedEngineer = useSelector((state) => state.filters.selectedEngineer)
 
@@ -88,7 +93,7 @@ export default function ReleaseStatus() {
     : tasks
 
   const overall = computeProgress(visibleTasks)
-  const featureGroups = groupByFeature(visibleTasks, EXCLUDE_ASSIGNEES)
+  const featureGroups = groupByMilestone(visibleTasks)
   const epicRows = buildEpicRows(visibleTasks, EXCLUDE_ASSIGNEES)
 
   return (
@@ -184,7 +189,7 @@ export default function ReleaseStatus() {
 
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Progress by Feature
+              Progress by Milestone
             </p>
             <FeatureProgressCards groups={featureGroups} />
           </div>
@@ -193,7 +198,7 @@ export default function ReleaseStatus() {
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
               Status by Epic
             </p>
-            <EpicStatusList rows={epicRows} />
+            <EpicStatusList rows={epicRows} isAdmin={isAdmin} onTaskDeleted={load} />
           </div>
         </>
       )}
