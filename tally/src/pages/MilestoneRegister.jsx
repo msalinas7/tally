@@ -6,10 +6,20 @@ import {
   deleteMilestone,
   fetchEpics,
   assignEpicToMilestone,
+  cascadeMilestoneDone,
 } from '../lib/queries/milestones'
 import { fetchReleases } from '../lib/queries/budget'
 
-const EMPTY_MILESTONE = { release_id: '', name: '', description: '' }
+const MILESTONE_STATUSES = ['Not Started', 'In Progress', 'QA Approved', 'Done']
+
+const STATUS_CLS = {
+  'Not Started':  'bg-slate-100 text-slate-500',
+  'In Progress':  'bg-blue-100 text-blue-700',
+  'QA Approved':  'bg-purple-100 text-purple-700',
+  'Done':         'bg-emerald-100 text-emerald-700',
+}
+
+const EMPTY_MILESTONE = { release_id: '', name: '', description: '', status: 'Not Started' }
 
 /* ── Small helpers ── */
 function Field({ label, children }) {
@@ -77,6 +87,13 @@ function MilestoneModal({ form, setForm, releases, onSave, onClose, saving, isEd
               rows={2}
               placeholder="Optional"
               className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            />
+          </Field>
+          <Field label="Status">
+            <SelectInput
+              value={form.status}
+              onChange={set('status')}
+              options={MILESTONE_STATUSES.map((s) => ({ value: s, label: s }))}
             />
           </Field>
         </div>
@@ -217,7 +234,7 @@ export default function MilestoneRegister() {
   }
 
   const openEdit = (m) => {
-    setForm({ release_id: m.release_id, name: m.name, description: m.description ?? '' })
+    setForm({ release_id: m.release_id, name: m.name, description: m.description ?? '', status: m.status ?? 'Not Started' })
     setModal({ mode: 'edit', id: m.id })
   }
 
@@ -229,13 +246,24 @@ export default function MilestoneRegister() {
       release_id: Number(form.release_id),
       name: form.name,
       description: form.description || null,
+      status: form.status || 'Not Started',
     }
-    const { error: e } =
+    const { data: saved, error: e } =
       modal.mode === 'add'
         ? await insertMilestone(payload)
         : await updateMilestone(modal.id, payload)
+    if (e) { setSaving(false); alert(e.message); return }
+
+    // Cascade: mark all tasks in this milestone's epics as Done
+    if (payload.status === 'Done') {
+      const milestoneId = modal.mode === 'edit' ? modal.id : saved?.id
+      if (milestoneId) {
+        const { error: ce } = await cascadeMilestoneDone(milestoneId)
+        if (ce) alert(`Milestone saved, but failed to cascade Done to tasks: ${ce.message}`)
+      }
+    }
+
     setSaving(false)
-    if (e) { alert(e.message); return }
     setModal(null)
     await loadMilestones(selectedRelease)
   }
@@ -304,6 +332,9 @@ export default function MilestoneRegister() {
                       <span className="font-semibold text-slate-900">{m.name}</span>
                       <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">
                         {m.releases?.version_name ?? '—'}
+                      </span>
+                      <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${STATUS_CLS[m.status] ?? STATUS_CLS['Not Started']}`}>
+                        {m.status ?? 'Not Started'}
                       </span>
                     </div>
                     {m.description && (

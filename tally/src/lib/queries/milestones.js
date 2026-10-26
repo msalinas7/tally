@@ -5,7 +5,7 @@ import { supabase } from '../supabase'
 export async function fetchMilestones(releaseId) {
   const q = supabase
     .from('milestones')
-    .select('id, release_id, name, description, releases(version_name)')
+    .select('id, release_id, name, description, status, releases(version_name)')
     .order('id', { ascending: true })
   if (releaseId) q.eq('release_id', releaseId)
   return q
@@ -51,6 +51,28 @@ export async function assignEpicToMilestone(epicId, milestoneId) {
     .from('epics')
     .update({ milestone_id: milestoneId })
     .eq('id', epicId)
+}
+
+// Cascade "Done" to all tasks whose epic belongs to this milestone
+export async function cascadeMilestoneDone(milestoneId) {
+  // 1. Get all epic IDs for this milestone
+  const { data: epicRows, error: epicErr } = await supabase
+    .from('epics')
+    .select('id')
+    .eq('milestone_id', milestoneId)
+  if (epicErr) return { error: epicErr }
+  if (!epicRows?.length) return { error: null }
+
+  const epicIds = epicRows.map((e) => e.id)
+
+  // 2. Update all tasks in those epics to Done
+  const { error: taskErr } = await supabase
+    .from('tasks')
+    .update({ status: 'Done' })
+    .in('epic_id', epicIds)
+    .neq('status', 'Done') // skip already-done tasks
+
+  return { error: taskErr }
 }
 
 // ── PM hours ────────────────────────────────────────────────
