@@ -1,10 +1,12 @@
-export default function FeatureProgressCards({ groups }) {
+export default function FeatureProgressCards({ groups, onSelect }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {groups.map(({ feature, pct, complete, total }) => (
-        <div
+      {groups.map(({ feature, pct, complete, total, tasks }) => (
+        <button
           key={feature}
-          className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+          type="button"
+          onClick={() => onSelect?.({ feature, pct, complete, total, tasks })}
+          className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm text-left w-full hover:border-[#1F3864] hover:shadow-md transition-all"
         >
           <p className="text-sm font-medium text-slate-500">{feature}</p>
           <p className={`mt-2 text-3xl font-semibold tracking-tight ${pct === 100 ? 'text-emerald-600' : 'text-slate-900'}`}>
@@ -19,7 +21,7 @@ export default function FeatureProgressCards({ groups }) {
               style={{ width: `${pct}%` }}
             />
           </div>
-        </div>
+        </button>
       ))}
     </div>
   )

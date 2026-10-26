@@ -6,11 +6,13 @@ import { useAuth } from '../components/AuthGuard'
 const ADMIN_EMAIL = 'maria.salinas@puzzle.tech'
 
 const ENGINEERS = ['Renan', 'Elkerton', 'Guilherme']
-import { getBacklogTasks, getProductVersionList } from '../lib/queries/v2status'
+import { getBacklogTasks, getProductVersionList, bulkAssignEpicToTasks } from '../lib/queries/v2status'
+import { fetchEpics } from '../lib/queries/milestones'
 import { buildEpicRows, groupByMilestone, computeProgress } from '../lib/v2status/aggregations'
 import OverallProgressCard from '../components/v2status/OverallProgressCard'
 import FeatureProgressCards from '../components/v2status/FeatureProgressCards'
 import EpicStatusList from '../components/v2status/EpicStatusList'
+import MilestoneTaskPanel from '../components/v2status/MilestoneTaskPanel'
 
 const REFRESH_INTERVAL_MS = 60_000
 const EXCLUDE_ASSIGNEES = []
@@ -32,6 +34,8 @@ export default function ReleaseStatus() {
 
   const [versions, setVersions] = useState([])
   const [tasks, setTasks] = useState([])
+  const [epics, setEpics] = useState([])
+  const [selectedMilestone, setSelectedMilestone] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastSynced, setLastSynced] = useState(null)
@@ -44,7 +48,7 @@ export default function ReleaseStatus() {
     ? versions
     : activeVersion ? [activeVersion] : []
 
-  // ── Load version list once ────────────────────────────────────────────────
+  // ── Load version list + epics once ───────────────────────────────────────
   useEffect(() => {
     getProductVersionList().then((list) => {
       setVersions(list)
@@ -52,6 +56,7 @@ export default function ReleaseStatus() {
         dispatch(setProductVersion(list[list.length - 1]))
       }
     })
+    fetchEpics().then(({ data }) => setEpics(data ?? []))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load tasks when active version changes ────────────────────────────────
@@ -95,6 +100,12 @@ export default function ReleaseStatus() {
   const overall = computeProgress(visibleTasks)
   const featureGroups = groupByMilestone(visibleTasks)
   const epicRows = buildEpicRows(visibleTasks, EXCLUDE_ASSIGNEES)
+
+  const handleBulkAssign = async (taskIds, epicId) => {
+    const { error: e } = await bulkAssignEpicToTasks(taskIds, epicId)
+    if (e) { alert(e.message); return }
+    await load()
+  }
 
   return (
     <div className="space-y-6">
@@ -191,17 +202,24 @@ export default function ReleaseStatus() {
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
               Progress by Milestone
             </p>
-            <FeatureProgressCards groups={featureGroups} />
+            <FeatureProgressCards groups={featureGroups} onSelect={setSelectedMilestone} />
           </div>
 
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
               Status by Epic
             </p>
-            <EpicStatusList rows={epicRows} isAdmin={isAdmin} onTaskDeleted={load} />
+            <EpicStatusList rows={epicRows} isAdmin={isAdmin} onTaskDeleted={load} epics={epics} onBulkAssign={handleBulkAssign} />
           </div>
         </>
       )}
+      <MilestoneTaskPanel
+        milestone={selectedMilestone}
+        epics={epics}
+        isAdmin={isAdmin}
+        onClose={() => setSelectedMilestone(null)}
+        onRefresh={async () => { await load(); setSelectedMilestone(null) }}
+      />
     </div>
   )
 }

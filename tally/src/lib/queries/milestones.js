@@ -28,7 +28,7 @@ export async function deleteMilestone(id) {
 export async function fetchEpics(projectId) {
   const q = supabase
     .from('epics')
-    .select('id, name, area, milestone_id, project_id, projects(name), milestones(name)')
+    .select('id, name, area, milestone_id, project_id, projects(name), milestones(name, releases(version_name))')
     .order('name')
   if (projectId) q.eq('project_id', projectId)
   return q

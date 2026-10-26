@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { BUCKET_COLORS } from '../../lib/v2status/aggregations'
 import { supabase } from '../../lib/supabase'
 
@@ -98,9 +98,68 @@ function BarLegend() {
   )
 }
 
+
+// ── Single task row ───────────────────────────────────────────────────────────
+
+function TaskRow({ task: t, isAdmin, isNoEpic, epics, onBulkAssign, deleting, onDelete }) {
+  const [epicId, setEpicId] = useState('')
+  const [assigning, setAssigning] = useState(false)
+
+  const handleAssign = async () => {
+    if (!epicId) return
+    setAssigning(true)
+    await onBulkAssign([t.id], Number(epicId))
+    setAssigning(false)
+  }
+
+  return (
+    <li className="flex items-start justify-between gap-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-xs text-slate-700 pt-0.5" title={t.name}>
+        {t.name}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        {isAdmin && epics?.length > 0 && (
+          <>
+            <select
+              value={epicId}
+              onChange={(e) => setEpicId(e.target.value)}
+              className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            >
+              <option value="">Assign epic…</option>
+              {epics.map((ep) => (
+                <option key={ep.id} value={ep.id}>{ep.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAssign}
+              disabled={!epicId || assigning}
+              className="rounded bg-[#1F3864] px-2 py-0.5 text-[10px] font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
+            >
+              {assigning ? '…' : '✓'}
+            </button>
+          </>
+        )}
+        <TaskStatusBadge status={t.status} />
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => onDelete(t.id, t.name)}
+            disabled={deleting === t.id}
+            className="text-[10px] text-slate-300 hover:text-red-500 disabled:opacity-40 transition-colors"
+            title="Delete task"
+          >
+            {deleting === t.id ? '…' : '✕'}
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
 // ── Task accordion panel ──────────────────────────────────────────────────────
 
-function TaskList({ tasks, isAdmin, onTaskDeleted }) {
+function TaskList({ tasks, isAdmin, onTaskDeleted, epics, onBulkAssign, isNoEpic }) {
   const [deleting, setDeleting] = useState(null)
 
   const handleDelete = async (taskId, taskName) => {
@@ -119,25 +178,16 @@ function TaskList({ tasks, isAdmin, onTaskDeleted }) {
       ) : (
         <ul className="divide-y divide-slate-100">
           {tasks.map((t) => (
-            <li key={t.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-xs text-slate-700" title={t.name}>
-                {t.name}
-              </span>
-              <div className="flex shrink-0 items-center gap-2">
-                <TaskStatusBadge status={t.status} />
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(t.id, t.name)}
-                    disabled={deleting === t.id}
-                    className="text-[10px] text-slate-300 hover:text-red-500 disabled:opacity-40 transition-colors"
-                    title="Delete task"
-                  >
-                    {deleting === t.id ? '…' : '✕'}
-                  </button>
-                )}
-              </div>
-            </li>
+            <TaskRow
+              key={t.id}
+              task={t}
+              isAdmin={isAdmin}
+              isNoEpic={isNoEpic}
+              epics={epics}
+              onBulkAssign={onBulkAssign}
+              deleting={deleting}
+              onDelete={handleDelete}
+            />
           ))}
         </ul>
       )}
@@ -147,7 +197,7 @@ function TaskList({ tasks, isAdmin, onTaskDeleted }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function EpicStatusList({ rows, isAdmin = false, onTaskDeleted }) {
+export default function EpicStatusList({ rows, isAdmin = false, onTaskDeleted, epics = [], onBulkAssign }) {
   const [openEpic, setOpenEpic] = useState(null)
 
   if (rows.length === 0) {
@@ -207,7 +257,16 @@ export default function EpicStatusList({ rows, isAdmin = false, onTaskDeleted })
               </button>
 
               {/* Accordion panel */}
-              {isOpen && <TaskList tasks={tasks ?? []} isAdmin={isAdmin} onTaskDeleted={onTaskDeleted} />}
+              {isOpen && (
+                <TaskList
+                  tasks={tasks ?? []}
+                  isAdmin={isAdmin}
+                  onTaskDeleted={onTaskDeleted}
+                  epics={epics}
+                  onBulkAssign={onBulkAssign}
+                  isNoEpic={epic === '(No epic)'}
+                />
+              )}
             </div>
           )
         })}

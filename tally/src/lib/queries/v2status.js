@@ -1,5 +1,9 @@
 import { supabase } from '../supabase'
 
+export async function bulkAssignEpicToTasks(taskIds, epicId) {
+  return supabase.from('tasks').update({ epic_id: epicId }).in('id', taskIds)
+}
+
 /**
  * Returns all distinct product versions present in the tasks table, sorted.
  * @returns {Promise<string[]>}
