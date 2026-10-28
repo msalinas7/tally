@@ -8,6 +8,7 @@ import EpicsManager from './pages/EpicsManager'
 import MilestoneRegister from './pages/MilestoneRegister'
 import ReleaseRegister from './pages/ReleaseRegister'
 import ReleaseStatus from './pages/ReleaseStatus'
+import PlanningConfig from './pages/PlanningConfig'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
             <Route path="/releases" element={<ReleaseRegister />} />
             <Route path="/milestones" element={<MilestoneRegister />} />
             <Route path="/epics" element={<EpicsManager />} />
+            <Route path="/planning" element={<PlanningConfig />} />
           </Route>
         </Routes>
       </AuthGuard>

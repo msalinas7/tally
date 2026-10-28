@@ -2,6 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { signOut } from '../lib/auth'
 import { useAuth } from './AuthGuard'
 
+const ADMIN_EMAIL = 'maria.salinas@puzzle.tech'
+
 const navItems = [
   { to: '/release-status', label: 'Release Status' },
   { to: '/dashboard', label: 'Dashboard' },
@@ -10,12 +12,14 @@ const navItems = [
   { to: '/releases', label: 'Release Register' },
   { to: '/milestones', label: 'Milestones' },
   { to: '/epics', label: 'Epics' },
+  { to: '/planning', label: 'Planning Config', adminOnly: true },
 ]
 
 export default function Layout() {
   const { user } = useAuth()
   const email = user?.email ?? ''
   const avatarUrl = user?.user_metadata?.avatar_url
+  const isAdmin = email.toLowerCase() === ADMIN_EMAIL
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -25,7 +29,7 @@ export default function Layout() {
           <p className="mt-1 text-xs text-white/60">Puzzle Tech</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3">
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.adminOnly || isAdmin).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
