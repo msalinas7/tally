@@ -95,18 +95,39 @@ function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted }) {
   )
 }
 
+const STATUS_ORDER = [
+  'In progress',
+  'In Code Review',
+  'Merged - Ready for Build',
+  'Ready For QA',
+  'In QA Review',
+  'QA Rejected',
+  'Blocked',
+  'Not started',
+  'Done',
+  'QA Approved',
+]
+
+function groupTasksByStatus(tasks) {
+  const map = new Map()
+  for (const status of STATUS_ORDER) map.set(status, [])
+  for (const t of tasks) {
+    const key = STATUS_ORDER.includes(t.status) ? t.status : 'Not started'
+    map.get(key).push(t)
+  }
+  return [...map.entries()].filter(([, list]) => list.length > 0)
+}
+
 export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose, onRefresh }) {
   if (!milestone) return null
 
   const { feature, pct, complete, total, tasks = [] } = milestone
+  const grouped = groupTasksByStatus(tasks)
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/20"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
 
       {/* Panel */}
       <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col bg-white shadow-xl">
@@ -116,11 +137,7 @@ export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose,
             <p className="text-base font-semibold text-slate-900">{feature}</p>
             <p className="mt-0.5 text-xs text-slate-400">{complete} of {total} tasks complete · {pct}%</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 text-xl leading-none mt-0.5"
-          >
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none mt-0.5">
             &times;
           </button>
         </div>
@@ -134,23 +151,28 @@ export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose,
         </div>
 
         {/* Task list */}
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           {tasks.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400">No tasks in this milestone.</p>
-          ) : (
-            <ul>
-              {tasks.map((t) => (
-                <TaskRow
-                  key={t.id}
-                  task={t}
-                  epics={epics}
-                  isAdmin={isAdmin}
-                  onAssigned={onRefresh}
-                  onDeleted={onRefresh}
-                />
-              ))}
-            </ul>
-          )}
+          ) : grouped.map(([status, statusTasks]) => (
+            <div key={status} className="mb-5">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {status} <span className="ml-1 text-slate-300">({statusTasks.length})</span>
+              </p>
+              <ul>
+                {statusTasks.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    epics={epics}
+                    isAdmin={isAdmin}
+                    onAssigned={onRefresh}
+                    onDeleted={onRefresh}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </div>
     </>
