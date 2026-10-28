@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 
 const BADGE_CLS = {
   'Ready for release': 'bg-emerald-100 text-emerald-700',
+  'Done':              'bg-emerald-600 text-white',
   'In progress':       'bg-blue-100 text-blue-700',
   'Blocked':           'bg-red-100 text-red-600',
   'Not started':       'bg-slate-100 text-slate-500',
