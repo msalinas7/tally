@@ -158,6 +158,13 @@ export function computeEpicStatus(epicTasks) {
  * @param {string[]} [excludeAssignees]
  * @returns {Array<{ epic: string, epicStatus: string, pct: number, complete: number, total: number, buckets: Object, tasks: Task[] }>}
  */
+const MILESTONE_STATUS_MAP = {
+  'In Progress':  'In progress',
+  'QA Approved':  'Ready for release',
+  'Done':         'Done',
+  'Not Started':  'Not started',
+}
+
 export function buildEpicRows(tasks, excludeAssignees = []) {
   const filtered = excludeAssignees.length
     ? tasks.filter((t) => !t.assignees.some((a) => excludeAssignees.includes(a)))
@@ -170,12 +177,15 @@ export function buildEpicRows(tasks, excludeAssignees = []) {
     epicMap.get(key).push(t)
   }
 
-  const STATUS_ORDER = { 'In progress': 0, 'Ready for release': 1, Blocked: 2, 'Not started': 3 }
+  const STATUS_ORDER = { 'In progress': 0, 'Ready for release': 1, Blocked: 2, 'Not started': 3, Done: 4 }
 
   return [...epicMap.entries()]
     .map(([epic, epicTasks]) => {
       const { pct, complete, total } = computeProgress(epicTasks)
-      const epicStatus = computeEpicStatus(epicTasks)
+      const milestoneStatus = epicTasks[0]?.milestoneStatus ?? null
+      const epicStatus = milestoneStatus
+        ? (MILESTONE_STATUS_MAP[milestoneStatus] ?? computeEpicStatus(epicTasks))
+        : computeEpicStatus(epicTasks)
       const buckets = {}
       for (const t of epicTasks) {
         const b = getStatusBucket(t.status)
