@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { bulkAssignEpicToTasks } from '../../lib/queries/v2status'
+import { bulkAssignEpicToTasks, updateTaskSP } from '../../lib/queries/v2status'
 import { supabase } from '../../lib/supabase'
 
 const TASK_BADGE_CLS = {
@@ -24,10 +24,28 @@ function TaskStatusBadge({ status }) {
   )
 }
 
-function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted }) {
+const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21]
+
+function SPSelect({ value, onChange, placeholder }) {
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      className="w-16 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+    >
+      <option value="">{placeholder}</option>
+      {FIBONACCI.map((n) => <option key={n} value={n}>{n} SP</option>)}
+    </select>
+  )
+}
+
+function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted, onRefresh }) {
   const [epicId, setEpicId] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [estimateSp, setEstimateSp] = useState(task.estimateSp)
+  const [qaReviewSp, setQaReviewSp] = useState(task.qaReviewSp ?? 0)
+  const [savingSP, setSavingSP] = useState(false)
 
   const handleAssign = async () => {
     if (!epicId) return
@@ -46,6 +64,15 @@ function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted }) {
     setDeleting(false)
     onDeleted?.()
   }
+
+  const handleSaveSP = async () => {
+    setSavingSP(true)
+    await updateTaskSP(task.id, { estimateSp, qaReviewSp })
+    setSavingSP(false)
+    onRefresh?.()
+  }
+
+  const spDirty = estimateSp !== task.estimateSp || qaReviewSp !== (task.qaReviewSp ?? 0)
 
   return (
     <li className="flex flex-col gap-2 py-3 border-b border-slate-100 last:border-0">
@@ -68,28 +95,49 @@ function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted }) {
       </div>
 
       {isAdmin && (
-        <div className="flex items-center gap-2">
-          <select
-            value={epicId}
-            onChange={(e) => setEpicId(e.target.value)}
-            className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
-          >
-            <option value="">Move to epic…</option>
-            {epics.map((ep) => (
-              <option key={ep.id} value={ep.id}>
-                {ep.name}{ep.milestones?.releases?.version_name ? ` · ${ep.milestones.releases.version_name}` : ''}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleAssign}
-            disabled={!epicId || assigning}
-            className="rounded bg-[#1F3864] px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
-          >
-            {assigning ? '…' : 'Move'}
-          </button>
-        </div>
+        <>
+          {/* SP editors */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 w-16 shrink-0">Dev SP</span>
+            <SPSelect value={estimateSp} onChange={setEstimateSp} placeholder="—" />
+            <span className="text-[10px] text-slate-400 w-14 shrink-0">QA SP</span>
+            <SPSelect value={qaReviewSp} onChange={setQaReviewSp} placeholder="0" />
+            {spDirty && (
+              <button
+                type="button"
+                onClick={handleSaveSP}
+                disabled={savingSP}
+                className="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-slate-900 disabled:opacity-40"
+              >
+                {savingSP ? '…' : 'Save'}
+              </button>
+            )}
+          </div>
+
+          {/* Epic mover */}
+          <div className="flex items-center gap-2">
+            <select
+              value={epicId}
+              onChange={(e) => setEpicId(e.target.value)}
+              className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            >
+              <option value="">Move to epic…</option>
+              {epics.map((ep) => (
+                <option key={ep.id} value={ep.id}>
+                  {ep.name}{ep.milestones?.releases?.version_name ? ` · ${ep.milestones.releases.version_name}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAssign}
+              disabled={!epicId || assigning}
+              className="rounded bg-[#1F3864] px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
+            >
+              {assigning ? '…' : 'Move'}
+            </button>
+          </div>
+        </>
       )}
     </li>
   )
@@ -168,6 +216,7 @@ export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose,
                     isAdmin={isAdmin}
                     onAssigned={onRefresh}
                     onDeleted={onRefresh}
+                    onRefresh={onRefresh}
                   />
                 ))}
               </ul>

@@ -4,6 +4,13 @@ export async function bulkAssignEpicToTasks(taskIds, epicId) {
   return supabase.from('tasks').update({ epic_id: epicId }).in('id', taskIds)
 }
 
+export async function updateTaskSP(taskId, { estimateSp, qaReviewSp }) {
+  return supabase
+    .from('tasks')
+    .update({ estimate_sp: estimateSp, qa_review_sp: qaReviewSp })
+    .eq('id', taskId)
+}
+
 /**
  * Returns all distinct product versions present in the tasks table, sorted.
  * @returns {Promise<string[]>}
@@ -81,7 +88,7 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
   // ── 1. Tasks + epic + assignee joins ──────────────────────────────────────
   const { data: rawTasks, error: te } = await supabase
     .from('tasks')
-    .select('id, task_name, product_version, epic_id, assigned_to_id, epics(id, name, milestones(id, name, status)), people(id, name)')
+    .select('id, task_name, product_version, epic_id, assigned_to_id, estimate_sp, qa_review_sp, epics(id, name, milestones(id, name, status)), people(id, name)')
     .eq('product_version', productVersion)
 
   if (te) throw te
@@ -114,6 +121,8 @@ export async function getBacklogTasks({ productVersion = 'V2', excludeAssignees 
     return {
       id: t.id,
       name: t.task_name ?? 'Untitled',
+      estimateSp: t.estimate_sp ?? null,
+      qaReviewSp: t.qa_review_sp ?? 0,
       status,
       unknownStatus: unknown,
       epic: t.epics?.name ?? null,
