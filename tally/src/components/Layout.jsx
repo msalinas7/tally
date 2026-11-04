@@ -12,7 +12,8 @@ const navItems = [
   { to: '/releases', label: 'Release Register' },
   { to: '/milestones', label: 'Milestones' },
   { to: '/epics', label: 'Epics' },
-  { to: '/planning', label: 'Planning Config', adminOnly: true },
+  { to: '/planning',      label: 'Planning Config',    adminOnly: true },
+  { to: '/dependencies',  label: 'Dependencies',       adminOnly: true },
 ]
 
 export default function Layout() {
