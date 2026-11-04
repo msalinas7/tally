@@ -11,11 +11,26 @@ import {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_VALUES = [1, 2, 3, 4, 5, 6, 7]
+
+// Fibonacci SP values supported by the system
+const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21]
+
+const DEFAULT_SP_RANGES = {
+  '0':  [0,   0],
+  '1':  [1,   2],
+  '2':  [2,   4],
+  '3':  [4,   8],
+  '5':  [8,  16],
+  '8':  [16, 32],
+  '13': [32, 64],
+  '21': [64, 120],
+}
+
 const DEFAULT_SETTINGS = {
-  start_date:      '',
-  hours_per_point: 4,
-  hours_per_day:   6,
-  working_days:    [1, 2, 3, 4, 5],
+  start_date:   '',
+  sp_ranges:    DEFAULT_SP_RANGES,
+  hours_per_day: 6,
+  working_days:  [1, 2, 3, 4, 5],
 }
 
 function Field({ label, hint, children }) {
@@ -50,10 +65,10 @@ function ProjectSettingsForm({ releaseId }) {
     fetchProjectSettings(releaseId).then(({ data }) => {
       if (data) {
         setForm({
-          start_date:      data.start_date ?? '',
-          hours_per_point: data.hours_per_point ?? 4,
-          hours_per_day:   data.hours_per_day ?? 6,
-          working_days:    data.working_days ?? [1, 2, 3, 4, 5],
+          start_date:    data.start_date ?? '',
+          sp_ranges:     data.sp_ranges ?? DEFAULT_SP_RANGES,
+          hours_per_day: data.hours_per_day ?? 6,
+          working_days:  data.working_days ?? [1, 2, 3, 4, 5],
         })
       } else {
         setForm(DEFAULT_SETTINGS)
@@ -74,10 +89,10 @@ function ProjectSettingsForm({ releaseId }) {
   const handleSave = async () => {
     setSaving(true)
     const { error } = await upsertProjectSettings(releaseId, {
-      start_date:      form.start_date || null,
-      hours_per_point: Number(form.hours_per_point),
-      hours_per_day:   Number(form.hours_per_day),
-      working_days:    form.working_days,
+      start_date:    form.start_date || null,
+      sp_ranges:     form.sp_ranges,
+      hours_per_day: Number(form.hours_per_day),
+      working_days:  form.working_days,
     })
     setSaving(false)
     if (error) { alert(error.message); return }
@@ -98,17 +113,72 @@ function ProjectSettingsForm({ releaseId }) {
         />
       </Field>
 
-      <Field label="Hours per Story Point" hint="1 SP = N working hours (used to compute task durations)">
-        <input
-          type="number"
-          min={0.5}
-          max={16}
-          step={0.5}
-          value={form.hours_per_point}
-          onChange={(e) => setForm((f) => ({ ...f, hours_per_point: e.target.value }))}
-          className="w-24 rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
-        />
-      </Field>
+      {/* SP → hour range table */}
+      <div>
+        <label className="block text-xs font-medium text-slate-500 mb-1">Story Point Hour Ranges</label>
+        <p className="text-[10px] text-slate-400 mb-2">
+          Each SP value maps to a min–max hour range. The Gantt uses these to compute task durations.
+        </p>
+        <div className="rounded-md border border-slate-200 overflow-hidden">
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium text-slate-500 w-20">Points</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Min hrs</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-500">Max hrs</th>
+                <th className="px-3 py-2 text-left font-medium text-slate-400">Expected</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {FIBONACCI.map((sp) => {
+                const key = String(sp)
+                const [min, max] = form.sp_ranges?.[key] ?? [0, 0]
+                const avg = sp === 0 ? 0 : ((min + max) / 2).toFixed(1)
+                return (
+                  <tr key={sp}>
+                    <td className="px-3 py-1.5 font-semibold text-slate-700">{sp} SP</td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={min}
+                        disabled={sp === 0}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            sp_ranges: { ...f.sp_ranges, [key]: [Number(e.target.value), max] },
+                          }))
+                        }
+                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864] disabled:bg-slate-50 disabled:text-slate-400"
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={max}
+                        disabled={sp === 0}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            sp_ranges: { ...f.sp_ranges, [key]: [min, Number(e.target.value)] },
+                          }))
+                        }
+                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864] disabled:bg-slate-50 disabled:text-slate-400"
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-slate-400 tabular-nums">
+                      {sp === 0 ? '0' : `${avg} hrs`}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <Field label="Effective Hours per Day" hint="Average productive hours per engineer per working day">
         <input
