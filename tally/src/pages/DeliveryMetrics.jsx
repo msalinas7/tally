@@ -34,22 +34,40 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 // ── Date / working-day helpers ─────────────────────────────────────────────────
 function dateStr(d) { return d.toISOString().slice(0, 10) }
 
+/**
+ * Normalize working_days to a Set of JS getDay() integers (0=Sun … 6=Sat).
+ * PlanningConfig stores integers 1-7 (1=Mon … 7=Sun).
+ * Legacy string format ('Mon','Tue'…) is also handled.
+ */
+function normalizeWorkingDays(wd) {
+  if (!wd?.length) return new Set([1, 2, 3, 4, 5]) // Mon–Fri default
+  if (typeof wd[0] === 'string') {
+    const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+    return new Set(wd.map((d) => map[d] ?? -1).filter((d) => d >= 0))
+  }
+  // Integer format from PlanningConfig: 1=Mon…6=Sat, 7=Sun → JS: 1-6, 0
+  return new Set(wd.map((d) => (d === 7 ? 0 : Number(d))))
+}
+
 function isWorkingDay(date, wdSet, blocked) {
-  if (!wdSet.has(DAY_NAMES[date.getDay()])) return false
+  if (!wdSet.has(date.getDay())) return false
   return !blocked.has(dateStr(date))
 }
 
 function nextWorkingDay(date, wdSet, blocked) {
   let d = new Date(date)
-  while (!isWorkingDay(d, wdSet, blocked)) d = new Date(d.getTime() + 86400000)
-  return d
+  for (let i = 0; i < 400; i++) {   // safety: max ~1 year
+    if (isWorkingDay(d, wdSet, blocked)) return d
+    d = new Date(d.getTime() + 86400000)
+  }
+  return new Date(date)              // fallback: return original
 }
 
 function addWorkingDays(startDate, days, wdSet, blocked) {
   if (days <= 0) return new Date(startDate)
   let d = new Date(startDate)
   let counted = 0
-  while (counted < days) {
+  for (let guard = 0; guard < days * 7 + 14 && counted < days; guard++) {
     d = new Date(d.getTime() + 86400000)
     if (isWorkingDay(d, wdSet, blocked)) counted++
   }
@@ -77,9 +95,8 @@ function buildSchedule({ settings, tasks, deps, holidays, epics, milestones, est
 
   const spRanges    = settings.sp_ranges ?? null
   const hoursPerDay = Number(settings.hours_per_day) || 8
-  const workingDays   = settings.working_days ?? ['Mon','Tue','Wed','Thu','Fri']
-  const wdSet         = new Set(workingDays)
-  const projectStart  = new Date(settings.start_date + 'T00:00:00')
+  const wdSet       = normalizeWorkingDays(settings.working_days)
+  const projectStart = new Date(settings.start_date + 'T00:00:00')
 
   // Build blocked-date sets
   const globalBlocked = new Set()
@@ -174,7 +191,34 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
   const { computed, epicComputed, msComputed } = schedule
   const rows = []
 
-  // Sort milestones by their computed start date
+  // Track which epics have been placed (some may not belong to any release milestone)
+  const placedEpicIds = new Set()
+
+  const addEpicRows = (epic, msColor) => {
+    placedEpicIds.add(epic.id)
+    const epicDates = epicComputed[epic.id]
+    rows.push({ type: 'epic', id: epic.id, item: epic, dates: epicDates, color: msColor, depth: 1 })
+
+    if (!expandedEpics.has(epic.id)) return
+
+    const epicTasks = tasks
+      .filter((t) => t.epic_id === epic.id)
+      .filter((t) => !filterPid || t.assigned_to_id === filterPid)
+      .sort((a, b) => {
+        const sa = computed[a.id]?.start ?? new Date(0)
+        const sb = computed[b.id]?.start ?? new Date(0)
+        return sa - sb
+      })
+
+    epicTasks.forEach((task) => {
+      const taskDates = computed[task.id]
+      const assignee  = task.assigned_to_id ? peopleMap[task.assigned_to_id] : null
+      rows.push({ type: 'task', id: task.id, item: task, dates: taskDates, color: msColor, depth: 2, assignee })
+    })
+  }
+
+  // ── Milestones (sorted by computed start) ──
+  const milestoneIds = new Set(milestones.map((m) => m.id))
   const sortedMs = [...milestones].sort((a, b) => {
     const sa = msComputed[a.id]?.start ?? new Date(0)
     const sb = msComputed[b.id]?.start ?? new Date(0)
@@ -196,28 +240,31 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
         return sa - sb
       })
 
-    msEpics.forEach((epic) => {
-      const epicDates = epicComputed[epic.id]
-      rows.push({ type: 'epic', id: epic.id, item: epic, dates: epicDates, color: msColor, depth: 1 })
-
-      if (!expandedEpics.has(epic.id)) return
-
-      const epicTasks = tasks
-        .filter((t) => t.epic_id === epic.id)
-        .filter((t) => !filterPid || t.assigned_to_id === filterPid)
-        .sort((a, b) => {
-          const sa = computed[a.id]?.start ?? new Date(0)
-          const sb = computed[b.id]?.start ?? new Date(0)
-          return sa - sb
-        })
-
-      epicTasks.forEach((task) => {
-        const taskDates = computed[task.id]
-        const assignee = task.assigned_to_id ? peopleMap[task.assigned_to_id] : null
-        rows.push({ type: 'task', id: task.id, item: task, dates: taskDates, color: msColor, depth: 2, assignee })
-      })
-    })
+    msEpics.forEach((epic) => addEpicRows(epic, msColor))
   })
+
+  // ── Epics not linked to any release milestone (orphan epics) ──
+  const orphanEpics = epics
+    .filter((e) => !placedEpicIds.has(e.id))
+    .sort((a, b) => {
+      const sa = epicComputed[a.id]?.start ?? new Date(0)
+      const sb = epicComputed[b.id]?.start ?? new Date(0)
+      return sa - sb
+    })
+
+  if (orphanEpics.length > 0) {
+    const orphanColor = '#64748B'
+    const fakeMs = { id: 'orphan', name: 'Other', status: '' }
+    const orphanDates = {
+      start: new Date(Math.min(...orphanEpics.map((e) => epicComputed[e.id]?.start ?? new Date()).filter(Boolean))),
+      end:   new Date(Math.max(...orphanEpics.map((e) => epicComputed[e.id]?.end   ?? new Date()).filter(Boolean))),
+    }
+    rows.push({ type: 'milestone', id: 'orphan', item: fakeMs, dates: orphanDates, color: orphanColor, depth: 0 })
+
+    if (expandedMs.has('orphan')) {
+      orphanEpics.forEach((epic) => addEpicRows(epic, orphanColor))
+    }
+  }
 
   return rows
 }
@@ -313,25 +360,45 @@ function GridBg({ projectStart, totalDays, totalRows }) {
 function DepArrows({ rows, deps, schedule, projectStart }) {
   if (!schedule) return null
 
-  // Build rowIndex map: taskId → rowIndex
-  const rowIdx = {}
-  rows.forEach((r, i) => { if (r.type === 'task') rowIdx[r.id] = i })
+  // Build rowIndex maps for tasks and epics
+  const taskRowIdx  = {}
+  const epicRowIdx  = {}
+  rows.forEach((r, i) => {
+    if (r.type === 'task')  taskRowIdx[r.id]  = i
+    if (r.type === 'epic')  epicRowIdx[r.id]  = i
+  })
 
-  const { computed } = schedule
+  const { computed, epicComputed } = schedule
   const arrows = []
 
   for (const dep of deps) {
-    if (dep.predecessor_kind !== 'task' || dep.successor_kind !== 'task') continue
-    const pi = rowIdx[dep.predecessor_id]
-    const si = rowIdx[dep.successor_id]
-    if (pi === undefined || si === undefined) continue
-    const pred = computed[dep.predecessor_id]
-    const succ = computed[dep.successor_id]
-    if (!pred || !succ) continue
+    const pk = dep.predecessor_kind
+    const sk = dep.successor_kind
 
-    const x1 = (calendarDayOffset(projectStart, pred.end) + 1) * COL_W
+    // Resolve dates + row indices for supported dep kinds
+    let predDates, succDates, pi, si
+
+    if (pk === 'task' && sk === 'task') {
+      pi = taskRowIdx[dep.predecessor_id]; si = taskRowIdx[dep.successor_id]
+      predDates = computed[dep.predecessor_id]; succDates = computed[dep.successor_id]
+    } else if (pk === 'epic' && sk === 'epic') {
+      pi = epicRowIdx[dep.predecessor_id]; si = epicRowIdx[dep.successor_id]
+      predDates = epicComputed[dep.predecessor_id]; succDates = epicComputed[dep.successor_id]
+    } else if (pk === 'task' && sk === 'epic') {
+      pi = taskRowIdx[dep.predecessor_id]; si = epicRowIdx[dep.successor_id]
+      predDates = computed[dep.predecessor_id]; succDates = epicComputed[dep.successor_id]
+    } else if (pk === 'epic' && sk === 'task') {
+      pi = epicRowIdx[dep.predecessor_id]; si = taskRowIdx[dep.successor_id]
+      predDates = epicComputed[dep.predecessor_id]; succDates = computed[dep.successor_id]
+    } else {
+      continue
+    }
+
+    if (pi === undefined || si === undefined || !predDates || !succDates) continue
+
+    const x1 = (calendarDayOffset(projectStart, predDates.end) + 1) * COL_W
     const y1 = pi * ROW_H + ROW_H / 2
-    const x2 = calendarDayOffset(projectStart, succ.start) * COL_W
+    const x2 = calendarDayOffset(projectStart, succDates.start) * COL_W
     const y2 = si * ROW_H + ROW_H / 2
 
     const midX = x1 + 10
@@ -343,9 +410,17 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
       path = `M${x1},${y1} L${midX},${y1} L${midX},${elbowY} L${x2 - 10},${elbowY} L${x2 - 10},${y2} L${x2},${y2}`
     }
 
+    const isEpicDep = pk === 'epic' || sk === 'epic'
     arrows.push(
-      <g key={`${dep.predecessor_id}-${dep.successor_id}`}>
-        <path d={path} fill="none" stroke="#94A3B8" strokeWidth={1.5} markerEnd="url(#arrowhead)" />
+      <g key={`${dep.predecessor_kind}-${dep.predecessor_id}-${dep.successor_kind}-${dep.successor_id}`}>
+        <path
+          d={path}
+          fill="none"
+          stroke={isEpicDep ? '#6366F1' : '#94A3B8'}
+          strokeWidth={isEpicDep ? 2 : 1.5}
+          strokeDasharray={isEpicDep ? '6 3' : undefined}
+          markerEnd={isEpicDep ? 'url(#arrowhead-epic)' : 'url(#arrowhead)'}
+        />
       </g>
     )
   }
@@ -362,6 +437,9 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
       <defs>
         <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
           <path d="M0,0 L6,3 L0,6 Z" fill="#94A3B8" />
+        </marker>
+        <marker id="arrowhead-epic" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#6366F1" />
         </marker>
       </defs>
       {arrows}
@@ -521,9 +599,10 @@ export default function DeliveryMetrics() {
     ]).then(([{ data: s }, gd]) => {
       setSettings(s)
       setGanttData(gd)
-      // Auto-expand all milestones on load
-      setExpandedMs(new Set((gd.milestones ?? []).map((m) => m.id)))
-      setExpandedEpics(new Set())
+      // Auto-expand all milestones (including virtual 'orphan' group) and epics
+      const msIds = [...(gd.milestones ?? []).map((m) => m.id), 'orphan']
+      setExpandedMs(new Set(msIds))
+      setExpandedEpics(new Set((gd.epics ?? []).map((e) => e.id)))
       setLoading(false)
     })
   }, [selectedRelease])
@@ -636,14 +715,18 @@ export default function DeliveryMetrics() {
           ))}
         </div>
 
-        {/* Expand/collapse all */}
+        {/* Expand/collapse all epics */}
         {!loading && ganttData && (
           <button
             type="button"
-            onClick={() => setExpandedEpics(new Set(ganttData.epics.map((e) => e.id)))}
-            className="text-xs text-slate-500 hover:text-slate-800 underline"
+            onClick={() => {
+              const allEpicIds = ganttData.epics.map((e) => e.id)
+              const allExpanded = allEpicIds.every((id) => expandedEpics.has(id))
+              setExpandedEpics(allExpanded ? new Set() : new Set(allEpicIds))
+            }}
+            className="text-xs text-slate-500 hover:text-slate-800 underline whitespace-nowrap"
           >
-            Expand all
+            {ganttData.epics.every((e) => expandedEpics.has(e.id)) ? 'Collapse tasks' : 'Expand tasks'}
           </button>
         )}
       </div>
