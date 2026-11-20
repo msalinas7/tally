@@ -5,7 +5,10 @@ import { fetchGanttData } from '../lib/queries/gantt'
 
 // ── Visual constants ───────────────────────────────────────────────────────────
 const COL_W      = 24   // px per calendar day
-const ROW_H      = 36
+const MS_ROW_H   = 36   // milestone row height
+const EPIC_ROW_H = 32   // epic row height
+const TASK_ROW_H = 28   // task row height
+const ROW_H      = 36   // default (used for grid math — keep equal to largest)
 const HEADER_H   = 52   // date header height (month row + day row)
 const SIDEBAR_W  = 300  // left tree panel width
 
@@ -14,11 +17,19 @@ const MS_PALETTE = [
 ]
 
 const TASK_STATUS_COLOR = {
-  'Done':        '#059669',
-  'QA Approved': '#3B82F6',
-  'In Progress': '#F59E0B',
-  'Blocked':     '#EF4444',
-  'Not Started': '#94A3B8',
+  // exact casing from task_events / tasks table
+  'Done':                     '#8CC63F',
+  'QA Approved':              '#8CC63F',
+  'In Progress':              '#29ABE0',
+  'In progress':              '#29ABE0',
+  'In Code Review':           '#6366F1',
+  'Merged - Ready for Build': '#8B5CF6',
+  'Ready For QA':             '#F59E0B',
+  'In QA Review':             '#F59E0B',
+  'QA Rejected':              '#EF4444',
+  'Blocked':                  '#EF4444',
+  'Not Started':              '#CBD5E1',
+  'Not started':              '#CBD5E1',
 }
 
 const MS_STATUS_CLS = {
@@ -89,19 +100,26 @@ function spToHours(sp, spRanges, mode) {
   return (min + max) / 2       // expected (default)
 }
 
+const MIN_TASK_DAYS = 2  // every task bar is at least this wide
+
 // ── Scheduler ──────────────────────────────────────────────────────────────────
 function buildSchedule({ settings, tasks, deps, holidays, epics, milestones, estMode = 'expected' }) {
-  if (!settings?.start_date) return null
+  const spRanges    = settings?.sp_ranges ?? null
+  const hoursPerDay = Number(settings?.hours_per_day) || 8
+  const wdSet       = normalizeWorkingDays(settings?.working_days)
 
-  const spRanges    = settings.sp_ranges ?? null
-  const hoursPerDay = Number(settings.hours_per_day) || 8
-  const wdSet       = normalizeWorkingDays(settings.working_days)
-  const projectStart = new Date(settings.start_date + 'T00:00:00')
+  // Fallback start: use configured date, or 30 days before today
+  const fallbackStart = new Date()
+  fallbackStart.setDate(fallbackStart.getDate() - 30)
+  fallbackStart.setHours(0, 0, 0, 0)
+  const projectStart = settings?.start_date
+    ? new Date(settings.start_date + 'T00:00:00')
+    : fallbackStart
 
   // Build blocked-date sets
   const globalBlocked = new Set()
   const personBlocked = {}
-  for (const h of holidays) {
+  for (const h of (holidays ?? [])) {
     if (h.kind === 'holiday') globalBlocked.add(h.date)
     else if (h.kind === 'pto' && h.people_id) {
       if (!personBlocked[h.people_id]) personBlocked[h.people_id] = new Set()
@@ -115,16 +133,16 @@ function buildSchedule({ settings, tasks, deps, holidays, epics, milestones, est
     return s
   }
 
-  // Task dependency graph: successorId → [{ predId, type, lag }]
+  // Task dependency graph
   const taskPreds = {}
-  for (const d of deps) {
+  for (const d of (deps ?? [])) {
     if (d.predecessor_kind === 'task' && d.successor_kind === 'task') {
       if (!taskPreds[d.successor_id]) taskPreds[d.successor_id] = []
       taskPreds[d.successor_id].push({ predId: d.predecessor_id, type: d.dependency_type, lag: d.lag_days ?? 0 })
     }
   }
 
-  const taskMap  = Object.fromEntries(tasks.map((t) => [t.id, t]))
+  const taskMap  = Object.fromEntries((tasks ?? []).map((t) => [t.id, t]))
   const computed = {}
 
   function computeTask(id, stack = new Set()) {
@@ -137,7 +155,8 @@ function buildSchedule({ settings, tasks, deps, holidays, epics, milestones, est
 
     const devHours = spToHours(task.estimate_sp ?? 0, spRanges, estMode)
     const qaHours  = spToHours(task.qa_review_sp ?? 0, spRanges, estMode)
-    const durDays  = Math.max(1, Math.ceil((devHours + qaHours) / hoursPerDay))
+    // Minimum MIN_TASK_DAYS days per task so bars are always visible
+    const durDays  = Math.max(MIN_TASK_DAYS, Math.ceil((devHours + qaHours) / hoursPerDay))
     const blocked  = getBlocked(task.assigned_to_id)
 
     let earliest = new Date(projectStart)
@@ -158,27 +177,44 @@ function buildSchedule({ settings, tasks, deps, holidays, epics, milestones, est
     return computed[id]
   }
 
-  for (const t of tasks) computeTask(t.id)
+  for (const t of (tasks ?? [])) computeTask(t.id)
 
-  // Roll up to epics
+  // Roll up to epics — always produce a span even with no tasks
   const epicComputed = {}
-  for (const epic of epics) {
-    const pts = tasks.filter((t) => t.epic_id === epic.id).map((t) => computed[t.id]).filter(Boolean)
-    if (!pts.length) continue
-    epicComputed[epic.id] = {
-      start: new Date(Math.min(...pts.map((t) => t.start))),
-      end:   new Date(Math.max(...pts.map((t) => t.end))),
+  for (const epic of (epics ?? [])) {
+    const epicTasks = (tasks ?? []).filter((t) => t.epic_id === epic.id)
+    const pts = epicTasks.map((t) => computed[t.id]).filter(Boolean)
+    if (pts.length) {
+      epicComputed[epic.id] = {
+        start: new Date(Math.min(...pts.map((t) => t.start))),
+        end:   new Date(Math.max(...pts.map((t) => t.end))),
+      }
+    } else {
+      // Epic with no computed tasks — give it a 2-day span at project start
+      const start = nextWorkingDay(projectStart, wdSet, globalBlocked)
+      epicComputed[epic.id] = {
+        start,
+        end: addWorkingDays(start, MIN_TASK_DAYS - 1, wdSet, globalBlocked),
+      }
     }
   }
 
   // Roll up to milestones
   const msComputed = {}
-  for (const ms of milestones) {
-    const pts = epics.filter((e) => e.milestone_id === ms.id).map((e) => epicComputed[e.id]).filter(Boolean)
-    if (!pts.length) continue
-    msComputed[ms.id] = {
-      start: new Date(Math.min(...pts.map((e) => e.start))),
-      end:   new Date(Math.max(...pts.map((e) => e.end))),
+  for (const ms of (milestones ?? [])) {
+    const msEpics = (epics ?? []).filter((e) => e.milestone_id === ms.id)
+    const pts = msEpics.map((e) => epicComputed[e.id]).filter(Boolean)
+    if (pts.length) {
+      msComputed[ms.id] = {
+        start: new Date(Math.min(...pts.map((e) => e.start))),
+        end:   new Date(Math.max(...pts.map((e) => e.end))),
+      }
+    } else {
+      const start = nextWorkingDay(projectStart, wdSet, globalBlocked)
+      msComputed[ms.id] = {
+        start,
+        end: addWorkingDays(start, MIN_TASK_DAYS - 1, wdSet, globalBlocked),
+      }
     }
   }
 
@@ -197,7 +233,7 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
   const addEpicRows = (epic, msColor) => {
     placedEpicIds.add(epic.id)
     const epicDates = epicComputed[epic.id]
-    rows.push({ type: 'epic', id: epic.id, item: epic, dates: epicDates, color: msColor, depth: 1 })
+    rows.push({ type: 'epic', id: epic.id, item: epic, dates: epicDates, color: msColor, depth: 1, rowH: EPIC_ROW_H })
 
     if (!expandedEpics.has(epic.id)) return
 
@@ -213,7 +249,7 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
     epicTasks.forEach((task) => {
       const taskDates = computed[task.id]
       const assignee  = task.assigned_to_id ? peopleMap[task.assigned_to_id] : null
-      rows.push({ type: 'task', id: task.id, item: task, dates: taskDates, color: msColor, depth: 2, assignee })
+      rows.push({ type: 'task', id: task.id, item: task, dates: taskDates, color: msColor, depth: 2, assignee, rowH: TASK_ROW_H })
     })
   }
 
@@ -228,7 +264,7 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
   sortedMs.forEach((ms, msIdx) => {
     const msDates = msComputed[ms.id]
     const msColor = MS_PALETTE[msIdx % MS_PALETTE.length]
-    rows.push({ type: 'milestone', id: ms.id, item: ms, dates: msDates, color: msColor, depth: 0 })
+    rows.push({ type: 'milestone', id: ms.id, item: ms, dates: msDates, color: msColor, depth: 0, rowH: MS_ROW_H })
 
     if (!expandedMs.has(ms.id)) return
 
@@ -259,7 +295,7 @@ function buildRows({ milestones, epics, tasks, schedule, expandedMs, expandedEpi
       start: new Date(Math.min(...orphanEpics.map((e) => epicComputed[e.id]?.start ?? new Date()).filter(Boolean))),
       end:   new Date(Math.max(...orphanEpics.map((e) => epicComputed[e.id]?.end   ?? new Date()).filter(Boolean))),
     }
-    rows.push({ type: 'milestone', id: 'orphan', item: fakeMs, dates: orphanDates, color: orphanColor, depth: 0 })
+    rows.push({ type: 'milestone', id: 'orphan', item: fakeMs, dates: orphanDates, color: orphanColor, depth: 0, rowH: MS_ROW_H })
 
     if (expandedMs.has('orphan')) {
       orphanEpics.forEach((epic) => addEpicRows(epic, orphanColor))
@@ -318,11 +354,10 @@ function DateHeader({ projectStart, totalDays }) {
 }
 
 // ── Grid background (weekend shading + today line) ─────────────────────────────
-function GridBg({ projectStart, totalDays, totalRows }) {
+function GridBg({ projectStart, totalDays, totalH }) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayOffset = calendarDayOffset(projectStart, today)
-  const totalH = totalRows * ROW_H
 
   return (
     <svg
@@ -357,7 +392,7 @@ function GridBg({ projectStart, totalDays, totalRows }) {
 }
 
 // ── Dependency arrows (SVG overlay) ───────────────────────────────────────────
-function DepArrows({ rows, deps, schedule, projectStart }) {
+function DepArrows({ rows, rowOffsets, deps, schedule, projectStart, totalH }) {
   if (!schedule) return null
 
   // Build rowIndex maps for tasks and epics
@@ -375,7 +410,6 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
     const pk = dep.predecessor_kind
     const sk = dep.successor_kind
 
-    // Resolve dates + row indices for supported dep kinds
     let predDates, succDates, pi, si
 
     if (pk === 'task' && sk === 'task') {
@@ -396,10 +430,12 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
 
     if (pi === undefined || si === undefined || !predDates || !succDates) continue
 
+    const pRh = rows[pi]?.rowH ?? ROW_H
+    const sRh = rows[si]?.rowH ?? ROW_H
     const x1 = (calendarDayOffset(projectStart, predDates.end) + 1) * COL_W
-    const y1 = pi * ROW_H + ROW_H / 2
+    const y1 = rowOffsets[pi] + pRh / 2
     const x2 = calendarDayOffset(projectStart, succDates.start) * COL_W
-    const y2 = si * ROW_H + ROW_H / 2
+    const y2 = rowOffsets[si] + sRh / 2
 
     const midX = x1 + 10
     let path
@@ -431,7 +467,7 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
     <svg
       className="absolute top-0 left-0 pointer-events-none"
       width="100%"
-      height={rows.length * ROW_H}
+      height={totalH}
       style={{ overflow: 'visible' }}
     >
       <defs>
@@ -449,9 +485,9 @@ function DepArrows({ rows, deps, schedule, projectStart }) {
 
 // ── Single Gantt row ───────────────────────────────────────────────────────────
 function GanttBarRow({ row, projectStart, totalDays }) {
-  const { type, dates, color, item } = row
+  const { type, dates, color, item, rowH: rh = ROW_H } = row
   if (!dates) {
-    return <div style={{ height: ROW_H }} className="border-b border-slate-100" />
+    return <div style={{ height: rh }} className="border-b border-slate-100" />
   }
 
   const left  = Math.max(0, calendarDayOffset(projectStart, dates.start)) * COL_W
@@ -460,10 +496,10 @@ function GanttBarRow({ row, projectStart, totalDays }) {
 
   if (type === 'milestone') {
     return (
-      <div className="relative border-b border-slate-100" style={{ height: ROW_H }}>
+      <div className="relative border-b border-slate-100" style={{ height: rh }}>
         <div
           className="absolute top-1/2 -translate-y-1/2 rounded flex items-center px-2 text-white text-[10px] font-semibold shadow-sm"
-          style={{ left, width, background: color, height: 20 }}
+          style={{ left, width, background: color, height: 22 }}
           title={item.name}
         >
           <span className="truncate">{item.name}</span>
@@ -474,10 +510,10 @@ function GanttBarRow({ row, projectStart, totalDays }) {
 
   if (type === 'epic') {
     return (
-      <div className="relative border-b border-slate-100" style={{ height: ROW_H }}>
+      <div className="relative border-b border-slate-100" style={{ height: rh }}>
         <div
-          className="absolute top-1/2 -translate-y-1/2 rounded text-[9px] font-medium flex items-center px-2 opacity-80"
-          style={{ left, width, background: color + '33', border: `1.5px solid ${color}99`, height: 16, color }}
+          className="absolute top-1/2 -translate-y-1/2 rounded text-[9px] font-medium flex items-center px-2 opacity-90"
+          style={{ left, width, background: color + '28', border: `1.5px solid ${color}99`, height: 18, color }}
           title={item.name}
         >
           <span className="truncate">{item.name}</span>
@@ -487,30 +523,46 @@ function GanttBarRow({ row, projectStart, totalDays }) {
   }
 
   // task
-  const statusColor = TASK_STATUS_COLOR[item.status] ?? '#94A3B8'
-  const totalSP = (item.estimate_sp ?? 0) + (item.qa_review_sp ?? 0)
+  const statusColor = TASK_STATUS_COLOR[item.status]  // may be undefined
+  const barColor    = statusColor ?? color             // fall back to milestone color — always visible
+  const totalSP     = (item.estimate_sp ?? 0) + (item.qa_review_sp ?? 0)
+  const barH        = 20
+  const INDENT      = 12  // visual nesting under epic
 
   return (
-    <div className="relative border-b border-slate-100" style={{ height: ROW_H }}>
+    <div className="relative border-b border-slate-100" style={{ height: rh, background: 'rgba(241,245,249,0.4)' }}>
       <div
-        className="absolute top-1/2 -translate-y-1/2 rounded text-[9px] text-white flex items-center px-1.5 gap-1"
-        style={{ left, width: Math.max(8, width), background: statusColor, height: 14 }}
-        title={`${item.task_name}${totalSP ? ` · ${totalSP} SP` : ''}`}
-      />
+        className="absolute rounded flex items-center px-2 gap-1 overflow-hidden"
+        style={{
+          left:    left + INDENT,
+          top:     '50%',
+          transform: 'translateY(-50%)',
+          width:   Math.max(barH, width),
+          height:  barH,
+          background: barColor,
+          opacity: statusColor ? 1 : 0.65,
+        }}
+        title={`${item.task_name}${item.status ? ` · ${item.status}` : ''}${totalSP ? ` · ${totalSP} SP` : ''}`}
+      >
+        <span className="text-[10px] text-white font-medium truncate leading-none">{item.task_name}</span>
+        {totalSP > 0 && width > 70 && (
+          <span className="text-[9px] text-white/70 shrink-0 ml-1">{totalSP}sp</span>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Sidebar tree row ───────────────────────────────────────────────────────────
 function SidebarRow({ row, expandedMs, expandedEpics, onToggleMs, onToggleEpic, peopleMap }) {
-  const { type, id, item, color, depth, assignee } = row
+  const { type, id, item, color, assignee, rowH: rh = ROW_H } = row
 
   if (type === 'milestone') {
     const expanded = expandedMs.has(id)
     return (
       <div
         className="flex items-center gap-1.5 border-b border-slate-100 px-3 cursor-pointer hover:bg-slate-50 select-none"
-        style={{ height: ROW_H }}
+        style={{ height: rh }}
         onClick={() => onToggleMs(id)}
       >
         <span className="text-slate-400 text-[10px] w-3 shrink-0">{expanded ? '▼' : '▶'}</span>
@@ -527,11 +579,12 @@ function SidebarRow({ row, expandedMs, expandedEpics, onToggleMs, onToggleEpic, 
     const expanded = expandedEpics.has(id)
     return (
       <div
-        className="flex items-center gap-1.5 border-b border-slate-100 px-3 cursor-pointer hover:bg-slate-50 select-none"
-        style={{ height: ROW_H, paddingLeft: 20 }}
+        className="flex items-center gap-1.5 border-b border-slate-100 cursor-pointer hover:bg-slate-50 select-none"
+        style={{ height: rh, paddingLeft: 20 }}
         onClick={() => onToggleEpic(id)}
       >
         <span className="text-slate-400 text-[10px] w-3 shrink-0">{expanded ? '▼' : '▶'}</span>
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
         <span className="text-xs text-slate-600 truncate flex-1">{item.name}</span>
       </div>
     )
@@ -539,15 +592,13 @@ function SidebarRow({ row, expandedMs, expandedEpics, onToggleMs, onToggleEpic, 
 
   // task
   const totalSP = (item.estimate_sp ?? 0) + (item.qa_review_sp ?? 0)
+  const statusColor = TASK_STATUS_COLOR[item.status] ?? '#CBD5E1'
   return (
     <div
-      className="flex items-center gap-1.5 border-b border-slate-100"
-      style={{ height: ROW_H, paddingLeft: 36 }}
+      className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/40"
+      style={{ height: rh, paddingLeft: 36 }}
     >
-      <span
-        className="w-2 h-2 rounded-full shrink-0"
-        style={{ background: TASK_STATUS_COLOR[item.status] ?? '#94A3B8' }}
-      />
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusColor }} />
       <span className="text-[11px] text-slate-600 truncate flex-1" title={item.task_name}>
         {item.task_name}
       </span>
@@ -623,8 +674,9 @@ export default function DeliveryMetrics() {
   )
 
   const schedule = useMemo(() => {
-    if (!settings || !ganttData) return null
-    return buildSchedule({ settings, ...ganttData, estMode })
+    if (!ganttData) return null
+    // Pass settings even if null — buildSchedule has fallbacks for every field
+    return buildSchedule({ settings: settings ?? {}, ...ganttData, estMode })
   }, [settings, ganttData, estMode])
 
   const rows = useMemo(() => {
@@ -640,6 +692,25 @@ export default function DeliveryMetrics() {
       peopleMap,
     })
   }, [ganttData, schedule, expandedMs, expandedEpics, filterPid, peopleMap])
+
+  // Scroll bars panel to show today (or project start) when chart loads
+  useEffect(() => {
+    if (!schedule || !barsScrollRef.current) return
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const offset = calendarDayOffset(schedule.projectStart, today)
+    const scrollTo = Math.max(0, (offset - 7) * COL_W)  // 7-day buffer before today
+    barsScrollRef.current.scrollLeft = scrollTo
+  }, [schedule])
+
+  const { rowOffsets, totalH: chartH } = useMemo(() => {
+    const offsets = []
+    let y = 0
+    for (const row of rows) {
+      offsets.push(y)
+      y += row.rowH ?? ROW_H
+    }
+    return { rowOffsets: offsets, totalH: y }
+  }, [rows])
 
   // Compute chart date range from schedule
   const { projectStart, totalDays } = useMemo(() => {
@@ -742,7 +813,7 @@ export default function DeliveryMetrics() {
       {/* ── Legend ── */}
       {!loading && (
         <div className="flex flex-wrap items-center gap-4 mb-3 text-[10px] text-slate-500">
-          {Object.entries(TASK_STATUS_COLOR).map(([s, c]) => (
+          {Object.entries(TASK_STATUS_COLOR).filter(([s]) => s === s.charAt(0).toUpperCase() + s.slice(1) && !['Not started','In progress'].includes(s)).map(([s, c]) => (
             <span key={s} className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />
               {s}
@@ -759,7 +830,7 @@ export default function DeliveryMetrics() {
         <div className="flex-1 flex items-center justify-center text-sm text-slate-400">Loading…</div>
       ) : !schedule ? (
         <div className="flex-1 flex items-center justify-center text-sm text-slate-400">
-          Configure project settings to generate the Gantt chart.
+          No data available. Select a release to view the Gantt chart.
         </div>
       ) : (
         /* ── Gantt layout ── */
@@ -800,25 +871,26 @@ export default function DeliveryMetrics() {
               <DateHeader projectStart={projectStart} totalDays={totalDays} />
 
               {/* Bars area */}
-              <div className="relative" style={{ height: rows.length * ROW_H }}>
-                <GridBg projectStart={projectStart} totalDays={totalDays} totalRows={rows.length} />
+              <div className="relative" style={{ height: chartH }}>
+                <GridBg projectStart={projectStart} totalDays={totalDays} totalH={chartH} />
 
                 {rows.map((row, rowI) => (
                   <div
                     key={`bar-${row.type}-${row.id}`}
                     className="absolute w-full"
-                    style={{ top: rowI * ROW_H, height: ROW_H }}
+                    style={{ top: rowOffsets[rowI], height: row.rowH ?? ROW_H }}
                   >
                     <GanttBarRow row={row} projectStart={projectStart} totalDays={totalDays} />
                   </div>
                 ))}
 
-                {/* Dependency arrows (task level only) */}
                 <DepArrows
                   rows={rows}
+                  rowOffsets={rowOffsets}
                   deps={ganttData.deps}
                   schedule={schedule}
                   projectStart={projectStart}
+                  totalH={chartH}
                 />
               </div>
             </div>

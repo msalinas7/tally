@@ -354,19 +354,22 @@ function HolidaysPTOSection({ releaseId, people }) {
       {entries.length === 0 ? (
         <p className="text-sm text-slate-400 py-4 text-center">No holidays or PTO entries.</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <table className="min-w-full text-sm">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Date', 'Type', 'Name', 'Engineer', 'Notes', ''].map((h) => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">{h}</th>
-                ))}
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500 w-32">Date</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500 w-24">Type</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Name</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500 w-32">Engineer</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Notes</th>
+                <th className="px-4 py-2.5 w-20" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {entries.map((e) => (
                 <tr key={e.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 tabular-nums text-slate-700">{e.date}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-slate-700 whitespace-nowrap">{e.date}</td>
                   <td className="px-4 py-2.5">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                       e.kind === 'holiday' ? 'bg-[#29ABE0]/10 text-[#29ABE0]' : 'bg-amber-100 text-amber-700'
