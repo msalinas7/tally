@@ -27,7 +27,7 @@ function TextInput({ value, onChange, placeholder }) {
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
     />
   )
 }
@@ -37,7 +37,7 @@ function SelectInput({ value, onChange, options, placeholder }) {
     <select
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => (
@@ -100,7 +100,7 @@ function EpicModal({ form, setForm, projects, milestones, onSave, onClose, savin
           <button
             onClick={onSave}
             disabled={saving}
-            className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e] disabled:opacity-50"
+            className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358] disabled:opacity-50"
           >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Epic'}
           </button>
@@ -215,7 +215,7 @@ export default function EpicsManager() {
         </div>
         <button
           onClick={openAdd}
-          className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e]"
+          className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358]"
         >
           + New Epic
         </button>
@@ -228,12 +228,12 @@ export default function EpicsManager() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search epics…"
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm w-56 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm w-56 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         />
         <select
           value={filterProject}
           onChange={(e) => setFilterProject(e.target.value)}
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           <option value="">All projects</option>
           {projects.map((p) => (
@@ -301,7 +301,7 @@ export default function EpicsManager() {
                           <div className="flex gap-3 justify-end">
                             <button
                               onClick={() => openEdit(ep)}
-                              className="text-xs text-[#1F3864] hover:underline"
+                              className="text-xs text-[#00406C] hover:underline"
                             >
                               Edit
                             </button>

@@ -5,9 +5,9 @@ import { supabase } from '../../lib/supabase'
 // ── Epic status badge ─────────────────────────────────────────────────────────
 
 const BADGE_CLS = {
-  'Ready for release': 'bg-emerald-100 text-emerald-700',
-  'Done':              'bg-emerald-600 text-white',
-  'In progress':       'bg-blue-100 text-blue-700',
+  'Ready for release': 'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'Done':              'bg-[#8CC63F] text-white',
+  'In progress':       'bg-[#29ABE0]/10 text-[#29ABE0]',
   'Blocked':           'bg-red-100 text-red-600',
   'Not started':       'bg-slate-100 text-slate-500',
 }
@@ -24,9 +24,9 @@ function EpicStatusBadge({ status }) {
 // ── Task status badge ─────────────────────────────────────────────────────────
 
 const TASK_BADGE_CLS = {
-  'done':                      'bg-emerald-100 text-emerald-700',
-  'qa approved':               'bg-emerald-100 text-emerald-700',
-  'in progress':               'bg-blue-100 text-blue-700',
+  'done':                      'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'qa approved':               'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'in progress':               'bg-[#29ABE0]/10 text-[#29ABE0]',
   'in code review':            'bg-indigo-100 text-indigo-700',
   'merged - ready for build':  'bg-cyan-100 text-cyan-700',
   'ready for qa':              'bg-purple-100 text-purple-700',
@@ -124,7 +124,7 @@ function TaskRow({ task: t, isAdmin, isNoEpic, epics, onBulkAssign, deleting, on
             <select
               value={epicId}
               onChange={(e) => setEpicId(e.target.value)}
-              className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+              className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             >
               <option value="">Assign epic…</option>
               {epics.map((ep) => (
@@ -135,7 +135,7 @@ function TaskRow({ task: t, isAdmin, isNoEpic, epics, onBulkAssign, deleting, on
               type="button"
               onClick={handleAssign}
               disabled={!epicId || assigning}
-              className="rounded bg-[#1F3864] px-2 py-0.5 text-[10px] font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
+              className="rounded bg-[#00406C] px-2 py-0.5 text-[10px] font-medium text-white hover:bg-[#003358] disabled:opacity-40"
             >
               {assigning ? '…' : '✓'}
             </button>

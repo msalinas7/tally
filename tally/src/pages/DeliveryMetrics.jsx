@@ -10,7 +10,7 @@ const HEADER_H   = 52   // date header height (month row + day row)
 const SIDEBAR_W  = 300  // left tree panel width
 
 const MS_PALETTE = [
-  '#1E40AF','#6D28D9','#065F46','#B45309','#9F1239','#1F3864','#0369A1',
+  '#1E40AF','#6D28D9','#065F46','#B45309','#9F1239','#00406C','#0369A1',
 ]
 
 const TASK_STATUS_COLOR = {
@@ -22,8 +22,8 @@ const TASK_STATUS_COLOR = {
 }
 
 const MS_STATUS_CLS = {
-  'Done':        'bg-emerald-100 text-emerald-700',
-  'QA Approved': 'bg-blue-100 text-blue-700',
+  'Done':        'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'QA Approved': 'bg-[#29ABE0]/10 text-[#29ABE0]',
   'In Progress': 'bg-amber-100 text-amber-700',
   'Not Started': 'bg-slate-100 text-slate-500',
 }
@@ -672,7 +672,7 @@ export default function DeliveryMetrics() {
       {/* ── Top bar ── */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold text-slate-900">Delivery Metrics</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Timeline</h1>
           <p className="mt-0.5 text-sm text-slate-500">Gantt chart · scheduled from task story points &amp; dependencies</p>
         </div>
 
@@ -680,7 +680,7 @@ export default function DeliveryMetrics() {
         <select
           value={selectedRelease?.id ?? ''}
           onChange={(e) => setSelectedRelease(releases.find((r) => String(r.id) === e.target.value))}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           {releases.map((r) => <option key={r.id} value={r.id}>{r.version_name}</option>)}
         </select>
@@ -690,7 +690,7 @@ export default function DeliveryMetrics() {
           <select
             value={filterPid ?? ''}
             onChange={(e) => setFilterPid(e.target.value ? Number(e.target.value) : null)}
-            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
           >
             <option value="">All developers</option>
             {activePeople.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -706,7 +706,7 @@ export default function DeliveryMetrics() {
               onClick={() => setEstMode(val)}
               className={`px-3 py-1.5 transition-colors ${
                 estMode === val
-                  ? 'bg-[#1F3864] text-white'
+                  ? 'bg-[#00406C] text-white'
                   : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
             >

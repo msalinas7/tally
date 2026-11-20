@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { setSelectedReleaseId, setSelectedEngineer } from '../store/filtersSlice'
 
@@ -110,6 +110,16 @@ export default function BudgetTracker() {
   const actualByName       = {}   // key: resource name (PM/QA from pm_hours)
   const unassignedActual   = {}   // engineers with hours but no role assignment
 
+  // Per-engineer hours breakdown: baseline_id → { [peopleId]: { name, hours } }
+  const engineerHoursByBaseline = {}
+  for (const er of engineerRoles) {
+    if (!engineerHoursByBaseline[er.baseline_id]) engineerHoursByBaseline[er.baseline_id] = {}
+    engineerHoursByBaseline[er.baseline_id][er.people_id] = {
+      name: er.people?.name ?? 'Unknown',
+      hours: 0,
+    }
+  }
+
   for (const row of visibleDevHours) {
     const pid  = row.assigned_to_id
     const name = row.resource ?? 'Unknown'
@@ -119,6 +129,10 @@ export default function BudgetTracker() {
     if (bId != null) {
       if (!actualByBaselineId[bId]) actualByBaselineId[bId] = { hours: 0 }
       actualByBaselineId[bId].hours += hrs
+      // Also accumulate into per-engineer breakdown
+      if (engineerHoursByBaseline[bId]?.[pid] != null) {
+        engineerHoursByBaseline[bId][pid].hours += hrs
+      }
     } else {
       const key = pid != null ? `pid:${pid}` : `name:${name}`
       if (!unassignedActual[key]) unassignedActual[key] = { hours: 0, name, pid: pid ?? null }
@@ -227,7 +241,7 @@ export default function BudgetTracker() {
         </div>
         <div className="flex items-center gap-3">
           <select
-            className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             value={selectedEngineer}
             onChange={(e) => { dispatch(setSelectedEngineer(e.target.value)); setFilterMilestone(''); setFilterEpic('') }}
           >
@@ -237,7 +251,7 @@ export default function BudgetTracker() {
             ))}
           </select>
           <select
-            className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+            className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             value={selectedRelease ?? ''}
             onChange={(e) => { dispatch(setSelectedReleaseId(Number(e.target.value))); setFilterMilestone(''); setFilterEpic('') }}
           >
@@ -260,7 +274,7 @@ export default function BudgetTracker() {
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.key
-                ? 'border-[#1F3864] text-[#1F3864]'
+                ? 'border-[#00406C] text-[#00406C]'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -284,6 +298,7 @@ export default function BudgetTracker() {
           totalVariance={totalVariance}
           totalBurn={totalBurn}
           releaseName={currentRelease?.version_name ?? ''}
+          engineerHoursByBaseline={engineerHoursByBaseline}
         />
       ) : tab === 'milestone' ? (
         <MilestoneBreakdown
@@ -322,7 +337,7 @@ function SummaryCard({ label, value, sub, warn }) {
 
 /* ── Burn bar ── */
 function BurnBar({ pct }) {
-  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500'
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-[#8CC63F]'
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -334,7 +349,7 @@ function BurnBar({ pct }) {
 }
 
 /* ── Overview tab ── */
-function Overview({ merged, chartData, totalBudget, totalActual, totalVariance, totalBurn, releaseName }) {
+function Overview({ merged, chartData, totalBudget, totalActual, totalVariance, totalBurn, releaseName, engineerHoursByBaseline }) {
   return (
     <>
       <div className="grid grid-cols-4 gap-4 mb-8">
@@ -354,8 +369,8 @@ function Overview({ merged, chartData, totalBudget, totalActual, totalVariance, 
               <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
               <Tooltip formatter={(v) => fmt(v)} />
               <Legend />
-              <Bar dataKey="Budgeted" fill="#1F3864" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Actual" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Budgeted" fill="#00406C" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Actual" fill="#29ABE0" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -378,38 +393,76 @@ function Overview({ merged, chartData, totalBudget, totalActual, totalVariance, 
                 </td>
               </tr>
             ) : (
-              merged.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    {row.resource}
-                    {row.unbudgeted && (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-xs text-amber-600">No rate</span>
+              merged.map((row) => {
+                const engBreakdown = row.source === 'task_events'
+                  ? Object.values(engineerHoursByBaseline?.[row.id] ?? {})
+                  : []
+                const hasBreakdown = engBreakdown.length > 0
+
+                return (
+                  <React.Fragment key={row.id}>
+                    <tr className={`hover:bg-slate-50 ${hasBreakdown ? 'border-b-0' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {row.resource}
+                        {row.unbudgeted && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-xs text-amber-600">No rate</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{row.role ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          row.source === 'task_events'
+                            ? 'bg-[#29ABE0]/10 text-[#29ABE0]'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {row.source === 'task_events' ? 'Dev Hours' : 'PM Hours'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{row.allocated_hours != null ? fmtHrs(row.allocated_hours) : '—'}</td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">{fmtHrs(row.actualHours)}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.unbudgeted ? '—' : fmt(row.budgeted_cost)}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.unbudgeted ? '—' : fmt(row.actualCost)}</td>
+                      <td className={`px-4 py-3 font-medium ${row.unbudgeted ? 'text-slate-400' : row.variance < 0 ? 'text-red-600' : 'text-[#8CC63F]'}`}>
+                        {row.unbudgeted ? '—' : fmt(row.variance)}
+                      </td>
+                      <td className="px-4 py-3 w-32">
+                        {row.unbudgeted
+                          ? <span className="text-xs text-amber-500">Add to baseline</span>
+                          : <BurnBar pct={row.burn} />}
+                      </td>
+                    </tr>
+                    {hasBreakdown && (
+                      <tr className="bg-slate-50/60">
+                        <td colSpan={9} className="px-4 pb-3 pt-0">
+                          <div className="pl-4 border-l-2 border-slate-200 ml-1 flex flex-wrap gap-2 mt-1">
+                            {engBreakdown
+                              .filter((e) => e.hours > 0)
+                              .sort((a, b) => b.hours - a.hours)
+                              .map((eng) => {
+                                const pct = row.actualHours > 0 ? Math.round((eng.hours / row.actualHours) * 100) : 0
+                                return (
+                                  <div
+                                    key={eng.name}
+                                    className="flex items-center gap-2 rounded-md bg-white border border-slate-200 px-3 py-1.5 text-xs"
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-[#29ABE0] shrink-0" />
+                                    <span className="font-medium text-slate-700">{eng.name.split(' ')[0]}</span>
+                                    <span className="text-slate-500">{fmtHrs(eng.hours)}</span>
+                                    <span className="text-slate-400">·</span>
+                                    <span className="text-slate-500 tabular-nums">{pct}%</span>
+                                  </div>
+                                )
+                              })}
+                            {engBreakdown.every((e) => e.hours === 0) && (
+                              <span className="text-xs text-slate-400 italic">No hours logged yet</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{row.role ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      row.source === 'task_events'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {row.source === 'task_events' ? 'Dev Hours' : 'PM Hours'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{row.allocated_hours != null ? fmtHrs(row.allocated_hours) : '—'}</td>
-                  <td className="px-4 py-3 text-slate-700">{fmtHrs(row.actualHours)}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.unbudgeted ? '—' : fmt(row.budgeted_cost)}</td>
-                  <td className="px-4 py-3 text-slate-700">{row.unbudgeted ? '—' : fmt(row.actualCost)}</td>
-                  <td className={`px-4 py-3 font-medium ${row.unbudgeted ? 'text-slate-400' : row.variance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {row.unbudgeted ? '—' : fmt(row.variance)}
-                  </td>
-                  <td className="px-4 py-3 w-32">
-                    {row.unbudgeted
-                      ? <span className="text-xs text-amber-500">Add to baseline</span>
-                      : <BurnBar pct={row.burn} />}
-                  </td>
-                </tr>
-              ))
+                  </React.Fragment>
+                )
+              })
             )}
           </tbody>
         </table>
@@ -429,7 +482,7 @@ function MilestoneBreakdown({ milestoneGroups, allMilestones, allEpics, filterMi
         <select
           value={filterMilestone}
           onChange={(e) => { setFilterMilestone(e.target.value); setFilterEpic('') }}
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           <option value="">All milestones</option>
           {allMilestones.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -437,7 +490,7 @@ function MilestoneBreakdown({ milestoneGroups, allMilestones, allEpics, filterMi
         <select
           value={filterEpic}
           onChange={(e) => setFilterEpic(e.target.value)}
-          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           <option value="">All epics</option>
           {allEpics.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -482,7 +535,7 @@ function MilestoneBreakdown({ milestoneGroups, allMilestones, allEpics, filterMi
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">
                             {Object.entries(data.resources).map(([res, hrs]) => (
-                              <span key={res} className="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                              <span key={res} className="inline-flex items-center rounded-full bg-[#29ABE0]/10 border border-[#29ABE0]/20 px-2 py-0.5 text-xs text-[#29ABE0]">
                                 {res.split(' ')[0]} · {Number(hrs).toFixed(1)}h
                               </span>
                             ))}
@@ -587,7 +640,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+      className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
     />
   )
 
@@ -600,7 +653,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
         </div>
         <button
           onClick={() => { setAdding(true); setForm(empty) }}
-          className="rounded-md bg-[#1F3864] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#162a4e]"
+          className="rounded-md bg-[#00406C] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#003358]"
         >
           + Add Resource
         </button>
@@ -615,7 +668,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
         </thead>
         <tbody className="divide-y divide-slate-100">
           {adding && (
-            <tr className="bg-blue-50">
+            <tr className="bg-[#29ABE0]/10">
               <td className="px-3 py-2"><Input value={form.resource} onChange={(v) => setForm((f) => ({ ...f, resource: v }))} placeholder="e.g. Mobile Developer" /></td>
               <td className="px-3 py-2 text-xs text-slate-400 italic">Assign after saving</td>
               <td className="px-3 py-2"><Input type="number" value={form.hourly_rate} onChange={(v) => setForm((f) => ({ ...f, hourly_rate: v }))} placeholder="0.00" /></td>
@@ -624,7 +677,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
               <td className="px-3 py-2"><Input value={form.notes} onChange={(v) => setForm((f) => ({ ...f, notes: v }))} placeholder="Optional" /></td>
               <td className="px-3 py-2">
                 <div className="flex gap-3">
-                  <button onClick={handleAdd} disabled={saving} className="text-xs font-medium text-emerald-600 hover:underline">Save</button>
+                  <button onClick={handleAdd} disabled={saving} className="text-xs font-medium text-[#8CC63F] hover:underline">Save</button>
                   <button onClick={() => setAdding(false)} className="text-xs text-slate-400 hover:underline">Cancel</button>
                 </div>
               </td>
@@ -644,7 +697,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
                   <td className="px-3 py-2"><Input value={editForm.notes} onChange={(v) => setEditForm((f) => ({ ...f, notes: v }))} /></td>
                   <td className="px-3 py-2">
                     <div className="flex gap-3">
-                      <button onClick={() => handleUpdate(row.id)} disabled={saving} className="text-xs font-medium text-emerald-600 hover:underline">Save</button>
+                      <button onClick={() => handleUpdate(row.id)} disabled={saving} className="text-xs font-medium text-[#8CC63F] hover:underline">Save</button>
                       <button onClick={() => setEditId(null)} className="text-xs text-slate-400 hover:underline">Cancel</button>
                     </div>
                   </td>
@@ -656,11 +709,11 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
                     {isDevRole(row.resource) ? (
                       <div className="flex flex-wrap gap-1 items-center">
                         {(engsByBaselineId[row.id] ?? []).map((er) => (
-                          <span key={er.id} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                          <span key={er.id} className="inline-flex items-center gap-1 rounded-full bg-[#29ABE0]/10 border border-[#29ABE0]/20 px-2 py-0.5 text-xs text-[#29ABE0]">
                             {(er.people?.name ?? '').split(' ')[0]}
                             <button
                               onClick={() => handleUnassignEngineer(er.id)}
-                              className="text-blue-400 hover:text-blue-700 leading-none font-medium"
+                              className="text-[#29ABE0] hover:text-[#29ABE0] leading-none font-medium"
                             >×</button>
                           </span>
                         ))}
@@ -670,7 +723,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
                             defaultValue=""
                             onChange={(e) => { if (e.target.value) handleAssignEngineer(row.id, e.target.value) }}
                             onBlur={() => setAssigningRowId(null)}
-                            className="rounded border border-slate-200 px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                            className="rounded border border-slate-200 px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#00406C]"
                           >
                             <option value="">Select…</option>
                             {people.filter((p) => !assignedPeopleIds.has(p.id)).map((p) => (
@@ -680,7 +733,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
                         ) : (
                           <button
                             onClick={() => setAssigningRowId(row.id)}
-                            className="inline-flex items-center rounded-full border border-dashed border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 hover:border-[#1F3864] hover:text-[#1F3864]"
+                            className="inline-flex items-center rounded-full border border-dashed border-slate-300 px-1.5 py-0.5 text-xs text-slate-400 hover:border-[#00406C] hover:text-[#00406C]"
                           >+</button>
                         )}
                       </div>
@@ -694,7 +747,7 @@ function BaselineMaintenance({ baseline, people, engineerRoles, selectedRelease,
                   <td className="px-4 py-3 text-slate-400 text-xs">{row.notes ?? '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex gap-3">
-                      <button onClick={() => { setEditId(row.id); setEditForm({ ...row }) }} className="text-xs text-[#1F3864] hover:underline">Edit</button>
+                      <button onClick={() => { setEditId(row.id); setEditForm({ ...row }) }} className="text-xs text-[#00406C] hover:underline">Edit</button>
                       <button onClick={() => handleDelete(row.id)} className="text-xs text-red-500 hover:underline">Remove</button>
                     </div>
                   </td>

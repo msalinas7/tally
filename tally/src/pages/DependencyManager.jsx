@@ -20,7 +20,7 @@ const KIND_LABELS  = { task: 'Task', epic: 'Epic', milestone: 'Milestone' }
 const KIND_FILTERS = ['all', 'task', 'epic', 'milestone']
 
 const KIND_BADGE = {
-  task:      'bg-blue-100 text-blue-700',
+  task:      'bg-[#29ABE0]/10 text-[#29ABE0]',
   epic:      'bg-purple-100 text-purple-700',
   milestone: 'bg-amber-100 text-amber-700',
 }
@@ -100,7 +100,7 @@ function ItemColumn({ title, items, selectedId, selectedKind, onSelect, dragRole
               onClick={() => setKindFilter(k)}
               className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
                 kindFilter === k
-                  ? 'bg-[#1F3864] text-white'
+                  ? 'bg-[#00406C] text-white'
                   : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
               }`}
             >
@@ -114,14 +114,14 @@ function ItemColumn({ title, items, selectedId, selectedKind, onSelect, dragRole
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search…"
-          className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         />
       </div>
 
       {/* Item list */}
       <div
         className={`flex-1 overflow-y-auto p-2 space-y-1 transition-colors ${
-          dropHighlight ? 'bg-blue-50' : ''
+          dropHighlight ? 'bg-[#29ABE0]/10' : ''
         }`}
         style={{ maxHeight: 380 }}
         onDragOver={(e) => { e.preventDefault() }}
@@ -140,7 +140,7 @@ function ItemColumn({ title, items, selectedId, selectedKind, onSelect, dragRole
               onClick={() => onSelect({ kind: item.kind, id: item.id, label: item.label })}
               className={`flex items-center gap-2 rounded-md px-3 py-2 cursor-grab select-none transition-colors ${
                 isSelected
-                  ? 'bg-[#1F3864] text-white'
+                  ? 'bg-[#00406C] text-white'
                   : 'hover:bg-slate-100 text-slate-800'
               }`}
             >
@@ -173,7 +173,7 @@ function DepTypeSelector({ value, onChange }) {
             title={d.hint}
             className={`w-12 rounded-md py-1.5 text-xs font-semibold transition-colors ${
               value === d.value
-                ? 'bg-[#1F3864] text-white shadow'
+                ? 'bg-[#00406C] text-white shadow'
                 : `${DEP_BADGE[d.value]} hover:opacity-80`
             }`}
           >
@@ -369,7 +369,7 @@ export default function DependencyManager() {
         <select
           value={selectedRelease?.id ?? ''}
           onChange={(e) => setSelectedRelease(releases.find((r) => String(r.id) === e.target.value))}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           {releases.map((r) => <option key={r.id} value={r.id}>{r.version_name}</option>)}
         </select>
@@ -384,7 +384,7 @@ export default function DependencyManager() {
 
             {/* Selection summary */}
             <div className="flex items-center gap-3 mb-4 min-h-[32px]">
-              <div className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${predecessor ? 'border-[#1F3864] bg-white text-slate-800 font-medium' : 'border-dashed border-slate-300 text-slate-400'}`}>
+              <div className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${predecessor ? 'border-[#00406C] bg-white text-slate-800 font-medium' : 'border-dashed border-slate-300 text-slate-400'}`}>
                 {predecessor ? (
                   <span className="flex items-center gap-2">
                     <Badge cls={KIND_BADGE[predecessor.kind]}>{KIND_LABELS[predecessor.kind]}</Badge>
@@ -395,7 +395,7 @@ export default function DependencyManager() {
               <span className="text-slate-300 font-mono text-sm shrink-0">
                 —[{depType}]→
               </span>
-              <div className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${successor ? 'border-[#1F3864] bg-white text-slate-800 font-medium' : 'border-dashed border-slate-300 text-slate-400'}`}>
+              <div className={`flex-1 rounded-md border px-3 py-1.5 text-xs ${successor ? 'border-[#00406C] bg-white text-slate-800 font-medium' : 'border-dashed border-slate-300 text-slate-400'}`}>
                 {successor ? (
                   <span className="flex items-center gap-2">
                     <Badge cls={KIND_BADGE[successor.kind]}>{KIND_LABELS[successor.kind]}</Badge>
@@ -428,7 +428,7 @@ export default function DependencyManager() {
                     type="number"
                     value={lagDays}
                     onChange={(e) => setLagDays(e.target.value)}
-                    className="w-14 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                    className="w-14 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[#00406C]"
                   />
                 </div>
               </div>
@@ -452,7 +452,7 @@ export default function DependencyManager() {
                 type="button"
                 onClick={handleCreate}
                 disabled={!canCreate || saving}
-                className="rounded-md bg-[#1F3864] px-5 py-2 text-sm font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
+                className="rounded-md bg-[#00406C] px-5 py-2 text-sm font-medium text-white hover:bg-[#003358] disabled:opacity-40"
               >
                 {saving ? 'Saving…' : 'Create Dependency'}
               </button>

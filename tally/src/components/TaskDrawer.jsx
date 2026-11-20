@@ -4,12 +4,12 @@ import { fetchTasksWithHierarchy } from '../lib/queries/delivery'
 const UNASSIGNED = '__unassigned__'
 
 const STATUS_STYLES = {
-  'In progress':              { bg: 'bg-blue-100',   text: 'text-blue-700' },
+  'In progress':              { bg: 'bg-[#29ABE0]/10',   text: 'text-[#29ABE0]' },
   'In Code Review':           { bg: 'bg-indigo-100', text: 'text-indigo-700' },
   'Merged - Ready for Build': { bg: 'bg-cyan-100',   text: 'text-cyan-700' },
   'Ready For QA':             { bg: 'bg-violet-100', text: 'text-violet-700' },
   'In QA Review':             { bg: 'bg-purple-100', text: 'text-purple-700' },
-  'QA Approved':              { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  'QA Approved':              { bg: 'bg-[#8CC63F]/10', text: 'text-[#8CC63F]' },
   'QA Rejected':              { bg: 'bg-red-100',    text: 'text-red-700' },
   'Blocked':                  { bg: 'bg-orange-100', text: 'text-orange-700' },
   'Not Started':                  { bg: 'bg-gray-100', text: 'text-gray-700' },
@@ -120,7 +120,7 @@ export default function TaskDrawer({ open, onClose, title, taskIds, accent = 'te
             <div key={epic}>
               {/* Epic heading */}
               <div className="mb-2">
-                <p className="text-xs font-semibold text-[#1F3864] uppercase tracking-wide">
+                <p className="text-xs font-semibold text-[#00406C] uppercase tracking-wide">
                   {epic === UNASSIGNED ? 'No epic' : epic}
                 </p>
                 {milestone && milestone !== UNASSIGNED && (

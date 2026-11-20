@@ -67,16 +67,17 @@ export default function AuthGuard({ children }) {
 
   if (!session) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold text-[#1F3864]">Tally</h1>
+      <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#FCFCFC' }}>
+        <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#29ABE0] mb-1">Puzzle</p>
+          <h1 className="text-2xl font-semibold text-[#001828]">Tally</h1>
           <p className="mt-2 text-sm text-slate-500">
-            Puzzle Tech delivery, budget, and release dashboard
+            Delivery, budget &amp; release dashboard
           </p>
           <button
             type="button"
             onClick={signInWithGoogle}
-            className="mt-6 w-full rounded-md bg-[#1F3864] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#182c4e]"
+            className="mt-6 w-full rounded-md bg-[#00406C] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#003358] transition-colors"
           >
             Sign in with Google
           </button>

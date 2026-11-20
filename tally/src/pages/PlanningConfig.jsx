@@ -109,7 +109,7 @@ function ProjectSettingsForm({ releaseId }) {
           type="date"
           value={form.start_date}
           onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-          className="rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         />
       </Field>
 
@@ -150,7 +150,7 @@ function ProjectSettingsForm({ releaseId }) {
                             sp_ranges: { ...f.sp_ranges, [key]: [Number(e.target.value), max] },
                           }))
                         }
-                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864] disabled:bg-slate-50 disabled:text-slate-400"
+                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#00406C] disabled:bg-slate-50 disabled:text-slate-400"
                       />
                     </td>
                     <td className="px-3 py-1.5">
@@ -166,7 +166,7 @@ function ProjectSettingsForm({ releaseId }) {
                             sp_ranges: { ...f.sp_ranges, [key]: [min, Number(e.target.value)] },
                           }))
                         }
-                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1F3864] disabled:bg-slate-50 disabled:text-slate-400"
+                        className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#00406C] disabled:bg-slate-50 disabled:text-slate-400"
                       />
                     </td>
                     <td className="px-3 py-1.5 text-slate-400 tabular-nums">
@@ -188,7 +188,7 @@ function ProjectSettingsForm({ releaseId }) {
           step={0.5}
           value={form.hours_per_day}
           onChange={(e) => setForm((f) => ({ ...f, hours_per_day: e.target.value }))}
-          className="w-24 rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="w-24 rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         />
       </Field>
 
@@ -203,7 +203,7 @@ function ProjectSettingsForm({ releaseId }) {
                 onClick={() => toggleDay(d)}
                 className={`w-10 h-10 rounded-md text-xs font-medium transition-colors ${
                   active
-                    ? 'bg-[#1F3864] text-white'
+                    ? 'bg-[#00406C] text-white'
                     : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                 }`}
               >
@@ -219,7 +219,7 @@ function ProjectSettingsForm({ releaseId }) {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e] disabled:opacity-50"
+          className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358] disabled:opacity-50"
         >
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Settings'}
         </button>
@@ -277,7 +277,7 @@ function HolidaysPTOSection({ releaseId, people }) {
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="text-xs text-[#1F3864] hover:underline"
+          className="text-xs text-[#00406C] hover:underline"
         >
           {adding ? 'Cancel' : '+ Add entry'}
         </button>
@@ -291,14 +291,14 @@ function HolidaysPTOSection({ releaseId, people }) {
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               />
             </Field>
             <Field label="Type">
               <select
                 value={form.kind}
                 onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value, people_id: '' }))}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               >
                 <option value="holiday">Holiday (company-wide)</option>
                 <option value="pto">PTO (individual)</option>
@@ -312,7 +312,7 @@ function HolidaysPTOSection({ releaseId, people }) {
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Christmas Day, Elkerton PTO"
-              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             />
           </Field>
 
@@ -321,7 +321,7 @@ function HolidaysPTOSection({ releaseId, people }) {
               <select
                 value={form.people_id}
                 onChange={(e) => setForm((f) => ({ ...f, people_id: e.target.value }))}
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               >
                 <option value="">Select engineer…</option>
                 {people.map((p) => (
@@ -336,7 +336,7 @@ function HolidaysPTOSection({ releaseId, people }) {
               type="text"
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+              className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             />
           </Field>
 
@@ -344,7 +344,7 @@ function HolidaysPTOSection({ releaseId, people }) {
             type="button"
             onClick={handleAdd}
             disabled={saving}
-            className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e] disabled:opacity-50"
+            className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358] disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Add Entry'}
           </button>
@@ -369,7 +369,7 @@ function HolidaysPTOSection({ releaseId, people }) {
                   <td className="px-4 py-2.5 tabular-nums text-slate-700">{e.date}</td>
                   <td className="px-4 py-2.5">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      e.kind === 'holiday' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                      e.kind === 'holiday' ? 'bg-[#29ABE0]/10 text-[#29ABE0]' : 'bg-amber-100 text-amber-700'
                     }`}>
                       {e.kind === 'holiday' ? 'Holiday' : 'PTO'}
                     </span>
@@ -435,7 +435,7 @@ export default function PlanningConfig() {
         <select
           value={selectedRelease}
           onChange={(e) => setSelectedRelease(e.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#00406C]"
         >
           {releases.map((r) => (
             <option key={r.id} value={r.id}>{r.version_name}</option>

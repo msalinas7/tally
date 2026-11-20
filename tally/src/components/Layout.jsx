@@ -6,8 +6,9 @@ const ADMIN_EMAIL = 'maria.salinas@puzzle.tech'
 
 const navItems = [
   { to: '/release-status', label: 'Release Status' },
+  { to: '/backlog', label: 'Backlog' },
   { to: '/dashboard', label: 'Dashboard' },
-  { to: '/delivery', label: 'Delivery Metrics' },
+  { to: '/delivery', label: 'Timeline' },
   { to: '/budget', label: 'Budget Tracker' },
   { to: '/releases', label: 'Release Register' },
   { to: '/milestones', label: 'Milestones' },
@@ -23,23 +24,24 @@ export default function Layout() {
   const isAdmin = email.toLowerCase() === ADMIN_EMAIL
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <aside className="fixed left-0 top-0 flex h-screen w-[240px] flex-col bg-[#1F3864] text-white">
-        <div className="px-6 py-6">
-          <p className="text-lg font-semibold tracking-wide">Tally</p>
-          <p className="mt-1 text-xs text-white/60">Puzzle Tech</p>
+    <div className="min-h-screen" style={{ backgroundColor: '#FCFCFC' }}>
+      <aside className="fixed left-0 top-0 flex h-screen w-[240px] flex-col bg-[#00406C] text-white">
+        {/* Brand wordmark */}
+        <div className="px-6 py-6 border-b border-white/10">
+          <p className="text-base font-semibold tracking-widest uppercase text-white">Tally</p>
+          <p className="mt-0.5 text-[10px] font-medium tracking-wide text-[#29ABE0]">by Puzzle</p>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3">
+        <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-3">
           {navItems.filter((item) => !item.adminOnly || isAdmin).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 [
-                  'rounded-md px-3 py-2 text-sm font-medium',
+                  'rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-white/15 text-white'
-                    : 'text-white/75 hover:bg-white/10 hover:text-white',
+                    ? 'bg-[#29ABE0]/20 text-white border-l-2 border-[#29ABE0]'
+                    : 'text-white/70 hover:bg-white/8 hover:text-white border-l-2 border-transparent',
                 ].join(' ')
               }
             >
@@ -47,10 +49,16 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        {/* Admin badge at bottom */}
+        {isAdmin && (
+          <div className="px-6 pb-5 pt-2">
+            <span className="text-[9px] font-semibold uppercase tracking-widest text-[#29ABE0]/60">Admin</span>
+          </div>
+        )}
       </aside>
 
       <div className="ml-[240px] flex min-h-screen flex-col">
-        <header className="flex h-16 items-center justify-end gap-3 border-b border-slate-200 bg-white px-6">
+        <header className="flex h-14 items-center justify-end gap-3 border-b border-slate-200/60 bg-white px-6">
           {avatarUrl ? (
             <img
               src={avatarUrl}
@@ -58,7 +66,7 @@ export default function Layout() {
               className="h-8 w-8 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1F3864] text-xs font-medium text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00406C] text-xs font-medium text-white">
               {email.charAt(0).toUpperCase() || '?'}
             </div>
           )}

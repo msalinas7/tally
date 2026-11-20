@@ -68,11 +68,11 @@ export function getStatusBucket(status) {
 }
 
 export const BUCKET_COLORS = {
-  Complete: '#95C53F',
-  'In QA': '#05AAE0',
-  'In development': '#03446D',
-  'Needs attention': '#E05C5C',
-  'Not started': '#E1EAF0',
+  Complete:         '#8CC63F',   // Puzzle Grow Green
+  'In QA':          '#29ABE0',   // Puzzle Signal Cyan
+  'In development': '#00406C',   // Puzzle Blue
+  'Needs attention':'#E05C5C',   // Red — universally understood for issues
+  'Not started':    '#E1EAF0',   // Light surface tint
 }
 
 // ── Core aggregations ─────────────────────────────────────────────────────────
@@ -80,13 +80,18 @@ export const BUCKET_COLORS = {
 /**
  * Computes overall progress for an array of tasks.
  * @param {import('../queries/v2status').Task[]} tasks
- * @returns {{ pct: number, complete: number, total: number }}
+ * @returns {{ pct: number, complete: number, total: number, buckets: Record<string,number> }}
  */
 export function computeProgress(tasks) {
   const total = tasks.length
-  if (total === 0) return { pct: 0, complete: 0, total: 0 }
-  const complete = tasks.filter((t) => COMPLETE_STATUSES.has(t.status)).length
-  return { pct: Math.round((complete / total) * 100), complete, total }
+  if (total === 0) return { pct: 0, complete: 0, total: 0, buckets: {} }
+  const buckets = {}
+  for (const t of tasks) {
+    const b = getStatusBucket(t.status)
+    buckets[b] = (buckets[b] ?? 0) + 1
+  }
+  const complete = buckets['Complete'] ?? 0
+  return { pct: Math.round((complete / total) * 100), complete, total, buckets }
 }
 
 /**

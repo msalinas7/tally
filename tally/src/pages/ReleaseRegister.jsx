@@ -13,8 +13,8 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-US', { month: 'sh
 
 const STATUS_COLORS = {
   Planning:    'bg-slate-100 text-slate-600',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  Released:    'bg-emerald-100 text-emerald-700',
+  'In Progress': 'bg-[#29ABE0]/10 text-[#29ABE0]',
+  Released:    'bg-[#8CC63F]/10 text-[#8CC63F]',
   'On Hold':   'bg-amber-100 text-amber-700',
   Cancelled:   'bg-red-100 text-red-600',
 }
@@ -65,7 +65,7 @@ function TextInput({ value, onChange, type = 'text', placeholder }) {
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#00406C]"
     />
   )
 }
@@ -75,7 +75,7 @@ function SelectInput({ value, onChange, options, placeholder }) {
     <select
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+      className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#00406C]"
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => (
@@ -169,7 +169,7 @@ function ReleaseModal({ form, setForm, projects, onSave, onClose, saving, isEdit
                 type="checkbox"
                 checked={form.rollback ?? false}
                 onChange={(e) => setForm((f) => ({ ...f, rollback: e.target.checked }))}
-                className="rounded border-slate-300 text-[#1F3864] focus:ring-[#1F3864]"
+                className="rounded border-slate-300 text-[#00406C] focus:ring-[#00406C]"
               />
               <span className="text-sm text-slate-600">Release was rolled back</span>
             </label>
@@ -183,7 +183,7 @@ function ReleaseModal({ form, setForm, projects, onSave, onClose, saving, isEdit
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 rows={3}
                 placeholder="Any additional context…"
-                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               />
             </Field>
           </div>
@@ -196,7 +196,7 @@ function ReleaseModal({ form, setForm, projects, onSave, onClose, saving, isEdit
           <button
             onClick={onSave}
             disabled={saving}
-            className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e] disabled:opacity-50"
+            className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358] disabled:opacity-50"
           >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Release'}
           </button>
@@ -306,7 +306,7 @@ export default function ReleaseRegister() {
         </div>
         <button
           onClick={openAdd}
-          className="rounded-md bg-[#1F3864] px-4 py-2 text-sm font-medium text-white hover:bg-[#162a4e]"
+          className="rounded-md bg-[#00406C] px-4 py-2 text-sm font-medium text-white hover:bg-[#003358]"
         >
           + New Release
         </button>

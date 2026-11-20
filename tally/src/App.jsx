@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AuthGuard from './components/AuthGuard'
 import Layout from './components/Layout'
+import Backlog from './pages/Backlog'
 import BudgetTracker from './pages/BudgetTracker'
 import Dashboard from './pages/Dashboard'
 import DeliveryMetrics from './pages/DeliveryMetrics'
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/release-status" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/release-status" element={<ReleaseStatus />} />
+            <Route path="/backlog" element={<Backlog />} />
             <Route path="/delivery" element={<DeliveryMetrics />} />
             <Route path="/budget" element={<BudgetTracker />} />
             <Route path="/releases" element={<ReleaseRegister />} />

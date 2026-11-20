@@ -26,7 +26,7 @@ function StatCard({ label, value, sub, accent, warn, tooltip, onClick }) {
         'rounded-lg border p-5 bg-white transition-all',
         warn ? 'border-amber-300' : 'border-slate-200',
         interactive
-          ? 'cursor-pointer hover:border-[#1F3864] hover:shadow-md hover:bg-slate-50 active:scale-[0.98]'
+          ? 'cursor-pointer hover:border-[#00406C] hover:shadow-md hover:bg-slate-50 active:scale-[0.98]'
           : '',
       ].join(' ')}
       onClick={onClick}
@@ -41,7 +41,7 @@ function StatCard({ label, value, sub, accent, warn, tooltip, onClick }) {
       <p className={`text-3xl font-bold mt-2 ${accent ?? 'text-slate-900'}`}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
       {interactive && (
-        <p className="mt-3 text-xs font-medium text-[#1F3864] flex items-center gap-1">
+        <p className="mt-3 text-xs font-medium text-[#00406C] flex items-center gap-1">
           View tasks <span className="text-sm">→</span>
         </p>
       )}
@@ -57,8 +57,8 @@ function SectionHeading({ title }) {
 /* ── Badge ── */
 const STATUS_COLORS = {
   Planning:      'bg-slate-100 text-slate-600',
-  'In Progress': 'bg-blue-100 text-blue-700',
-  Released:      'bg-emerald-100 text-emerald-700',
+  'In Progress': 'bg-[#29ABE0]/10 text-[#29ABE0]',
+  Released:      'bg-[#8CC63F]/10 text-[#8CC63F]',
   'On Hold':     'bg-amber-100 text-amber-700',
   Cancelled:     'bg-red-100 text-red-600',
 }
@@ -73,7 +73,7 @@ function Badge({ status }) {
 
 /* ── Burn bar ── */
 function BurnBar({ pct }) {
-  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-emerald-500'
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-[#8CC63F]'
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -235,7 +235,7 @@ export default function Dashboard() {
               id="release-filter"
               value={selectedReleaseId ?? ''}
               onChange={(e) => dispatch(setSelectedReleaseId(Number(e.target.value)))}
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm focus:border-[#29ABE0] focus:outline-none focus:ring-1 focus:ring-[#29ABE0]"
             >
               {releases.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -287,15 +287,15 @@ export default function Dashboard() {
               label="In Flight"
               value={inFlight}
               sub="started, not yet done"
-              accent="text-blue-600"
-              onClick={() => setDrawer({ open: true, title: 'In Flight', taskIds: inFlightIds, accent: 'text-blue-600' })}
+              accent="text-[#29ABE0]"
+              onClick={() => setDrawer({ open: true, title: 'In Flight', taskIds: inFlightIds, accent: 'text-[#29ABE0]' })}
             />
             <StatCard
               label="Delivered"
               value={filteredCompleted.length}
               sub="reached Done status"
-              accent="text-emerald-600"
-              onClick={() => setDrawer({ open: true, title: 'Delivered', taskIds: deliveredIds, accent: 'text-emerald-600' })}
+              accent="text-[#8CC63F]"
+              onClick={() => setDrawer({ open: true, title: 'Delivered', taskIds: deliveredIds, accent: 'text-[#8CC63F]' })}
             />
           </div>
 
@@ -402,7 +402,7 @@ export default function Dashboard() {
                       return (
                         <tr
                           key={r.id}
-                          className={`hover:bg-slate-50 cursor-pointer ${r.id === selectedReleaseId ? 'bg-blue-50' : ''}`}
+                          className={`hover:bg-slate-50 cursor-pointer ${r.id === selectedReleaseId ? 'bg-[#29ABE0]/10' : ''}`}
                           onClick={() => dispatch(setSelectedReleaseId(r.id))}
                         >
                           <td className="px-4 py-3 font-medium text-slate-900">{r.version_name}</td>

@@ -103,7 +103,7 @@ export default function ReleaseStatus() {
               <select
                 value={activeVersion ?? ''}
                 onChange={(e) => dispatch(setProductVersion(e.target.value))}
-                className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#00406C] focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               >
                 {selectorVersions.map((v) => (
                   <option key={v} value={v}>{v}</option>

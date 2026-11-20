@@ -128,7 +128,7 @@ export default function ReleaseStatus() {
             <select
               value={selectedEngineer}
               onChange={(e) => dispatch(setSelectedEngineer(e.target.value))}
-              className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+              className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#00406C] focus:outline-none focus:ring-1 focus:ring-[#00406C]"
             >
               <option value="">Entire project</option>
               {ENGINEERS.map((eng) => (
@@ -144,7 +144,7 @@ export default function ReleaseStatus() {
               <select
                 value={activeVersion ?? ''}
                 onChange={(e) => dispatch(setProductVersion(e.target.value))}
-                className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#1F3864] focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
+                className="min-w-[160px] rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 shadow-sm focus:border-[#00406C] focus:outline-none focus:ring-1 focus:ring-[#00406C]"
               >
                 {selectorVersions.map((v) => (
                   <option key={v} value={v}>{v}</option>
@@ -215,10 +215,7 @@ export default function ReleaseStatus() {
       )}
       <MilestoneTaskPanel
         milestone={selectedMilestone}
-        epics={epics}
-        isAdmin={isAdmin}
         onClose={() => setSelectedMilestone(null)}
-        onRefresh={async () => { await load(); setSelectedMilestone(null) }}
       />
     </div>
   )

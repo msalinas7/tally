@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { bulkAssignEpicToTasks, updateTaskSP } from '../../lib/queries/v2status'
-import { supabase } from '../../lib/supabase'
 
 const TASK_BADGE_CLS = {
-  'done':                      'bg-emerald-100 text-emerald-700',
-  'qa approved':               'bg-emerald-100 text-emerald-700',
-  'in progress':               'bg-blue-100 text-blue-700',
+  'done':                      'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'qa approved':               'bg-[#8CC63F]/10 text-[#8CC63F]',
+  'in progress':               'bg-[#29ABE0]/10 text-[#29ABE0]',
   'in code review':            'bg-indigo-100 text-indigo-700',
   'merged - ready for build':  'bg-cyan-100 text-cyan-700',
   'ready for qa':              'bg-purple-100 text-purple-700',
@@ -24,121 +22,11 @@ function TaskStatusBadge({ status }) {
   )
 }
 
-const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21]
-
-function SPSelect({ value, onChange, placeholder }) {
+function TaskRow({ task }) {
   return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-      className="w-16 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
-    >
-      <option value="">{placeholder}</option>
-      {FIBONACCI.map((n) => <option key={n} value={n}>{n} SP</option>)}
-    </select>
-  )
-}
-
-function TaskRow({ task, epics, isAdmin, onAssigned, onDeleted, onRefresh }) {
-  const [epicId, setEpicId] = useState('')
-  const [assigning, setAssigning] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [estimateSp, setEstimateSp] = useState(task.estimateSp)
-  const [qaReviewSp, setQaReviewSp] = useState(task.qaReviewSp ?? 0)
-  const [savingSP, setSavingSP] = useState(false)
-
-  const handleAssign = async () => {
-    if (!epicId) return
-    setAssigning(true)
-    await bulkAssignEpicToTasks([task.id], Number(epicId))
-    setAssigning(false)
-    setEpicId('')
-    onAssigned?.()
-  }
-
-  const handleDelete = async () => {
-    if (!window.confirm(`Delete "${task.name}"? This cannot be undone.`)) return
-    setDeleting(true)
-    await supabase.from('task_events').delete().eq('task_id', task.id)
-    await supabase.from('tasks').delete().eq('id', task.id)
-    setDeleting(false)
-    onDeleted?.()
-  }
-
-  const handleSaveSP = async () => {
-    setSavingSP(true)
-    await updateTaskSP(task.id, { estimateSp, qaReviewSp })
-    setSavingSP(false)
-    onRefresh?.()
-  }
-
-  const spDirty = estimateSp !== task.estimateSp || qaReviewSp !== (task.qaReviewSp ?? 0)
-
-  return (
-    <li className="flex flex-col gap-2 py-3 border-b border-slate-100 last:border-0">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-slate-800 leading-snug flex-1">{task.name}</span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <TaskStatusBadge status={task.status} />
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-[10px] text-slate-300 hover:text-red-500 disabled:opacity-40 transition-colors"
-              title="Delete task"
-            >
-              {deleting ? '…' : '✕'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {isAdmin && (
-        <>
-          {/* SP editors */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 w-16 shrink-0">Dev SP</span>
-            <SPSelect value={estimateSp} onChange={setEstimateSp} placeholder="—" />
-            <span className="text-[10px] text-slate-400 w-14 shrink-0">QA SP</span>
-            <SPSelect value={qaReviewSp} onChange={setQaReviewSp} placeholder="0" />
-            {spDirty && (
-              <button
-                type="button"
-                onClick={handleSaveSP}
-                disabled={savingSP}
-                className="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-slate-900 disabled:opacity-40"
-              >
-                {savingSP ? '…' : 'Save'}
-              </button>
-            )}
-          </div>
-
-          {/* Epic mover */}
-          <div className="flex items-center gap-2">
-            <select
-              value={epicId}
-              onChange={(e) => setEpicId(e.target.value)}
-              className="flex-1 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1F3864]"
-            >
-              <option value="">Move to epic…</option>
-              {epics.map((ep) => (
-                <option key={ep.id} value={ep.id}>
-                  {ep.name}{ep.milestones?.releases?.version_name ? ` · ${ep.milestones.releases.version_name}` : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleAssign}
-              disabled={!epicId || assigning}
-              className="rounded bg-[#1F3864] px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[#162a4e] disabled:opacity-40"
-            >
-              {assigning ? '…' : 'Move'}
-            </button>
-          </div>
-        </>
-      )}
+    <li className="flex items-start justify-between gap-3 py-3">
+      <span className="text-xs font-medium text-slate-800 leading-snug flex-1">{task.name}</span>
+      <TaskStatusBadge status={task.status} />
     </li>
   )
 }
@@ -166,11 +54,23 @@ function groupTasksByStatus(tasks) {
   return [...map.entries()].filter(([, list]) => list.length > 0)
 }
 
-export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose, onRefresh }) {
+function groupTasksByEpic(tasks) {
+  const map = new Map()
+  for (const t of tasks) {
+    const key = t.epic ?? '(No epic)'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(t)
+  }
+  return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+}
+
+export default function MilestoneTaskPanel({ milestone, onClose }) {
+  const [groupBy, setGroupBy] = useState('status')
+
   if (!milestone) return null
 
   const { feature, pct, complete, total, tasks = [] } = milestone
-  const grouped = groupTasksByStatus(tasks)
+  const grouped = groupBy === 'epic' ? groupTasksByEpic(tasks) : groupTasksByStatus(tasks)
 
   return (
     <>
@@ -193,35 +93,59 @@ export default function MilestoneTaskPanel({ milestone, epics, isAdmin, onClose,
         {/* Progress bar */}
         <div className="h-1 w-full bg-slate-100">
           <div
-            className={`h-1 transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : 'bg-[#1F3864]'}`}
+            className={`h-1 transition-all duration-500 ${pct === 100 ? 'bg-[#8CC63F]' : 'bg-[#00406C]'}`}
             style={{ width: `${pct}%` }}
           />
+        </div>
+
+        {/* Group-by control */}
+        <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-2.5 bg-slate-50/50">
+          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Group by</span>
+          <div className="flex gap-1">
+            {[
+              { value: 'status', label: 'Status' },
+              { value: 'epic',   label: 'Epic'   },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setGroupBy(value)}
+                className={`rounded px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                  groupBy === value
+                    ? 'bg-[#00406C] text-white'
+                    : 'bg-white border border-slate-200 text-slate-500 hover:border-[#00406C] hover:text-[#00406C]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Task list */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {tasks.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400">No tasks in this milestone.</p>
-          ) : grouped.map(([status, statusTasks]) => (
-            <div key={status} className="mb-5">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                {status} <span className="ml-1 text-slate-300">({statusTasks.length})</span>
-              </p>
-              <ul>
-                {statusTasks.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    epics={epics}
-                    isAdmin={isAdmin}
-                    onAssigned={onRefresh}
-                    onDeleted={onRefresh}
-                    onRefresh={onRefresh}
-                  />
-                ))}
-              </ul>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {grouped.map(([groupLabel, groupTasks]) => (
+                <div key={groupLabel} className="rounded-lg border border-slate-200 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[#00406C]">
+                    <span className="text-[11px] font-semibold text-white">{groupLabel}</span>
+                    <span className="text-[11px] text-white/60">({groupTasks.length})</span>
+                  </div>
+                  <ul className="divide-y divide-slate-100 bg-white px-3">
+                    {groupTasks.map((t) => (
+                      <TaskRow
+                        key={t.id}
+                        task={t}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </>
