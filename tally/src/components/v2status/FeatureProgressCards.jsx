@@ -29,6 +29,8 @@ export default function FeatureProgressCards({ groups, onSelect }) {
                 style={{ width: `${pct}%` }}
               />
             </div>
+
+            <p className="mt-3 text-[11px] font-medium text-[#29ABE0]">View Tasks →</p>
           </button>
         )
       })}
